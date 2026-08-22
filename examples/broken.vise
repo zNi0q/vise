@@ -1,0 +1,6 @@
+module broken
+
+fn main() {
+  let myVar = 0x10
+  print("unclosed {name)
+}

@@ -1,0 +1,8 @@
+module greet
+
+fn main() {
+  let names = ["ada", "alan", "grace"]
+  for n in names {
+    print("hello, {n}")
+  }
+}

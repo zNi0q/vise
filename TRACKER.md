@@ -13,7 +13,7 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [x] Repository, `.gitignore`, commit conventions
 - [x] Cargo workspace, zero third-party dependencies (`vise-diag` added
       for shared diagnostics, so eight crates rather than seven)
-- [ ] `vise` CLI skeleton with `--json` diagnostics flag
+- [x] `vise` CLI skeleton: `lex`, `explain`, `--json`
 - [ ] CI: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`
 
 ## M1 — Front end
