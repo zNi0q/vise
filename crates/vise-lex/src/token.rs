@@ -37,7 +37,6 @@ pub enum TokenKind {
     Type,
     Record,
     Enum,
-    Open,
     Match,
     If,
     Else,
@@ -124,7 +123,6 @@ impl TokenKind {
             Self::Type => "type",
             Self::Record => "record",
             Self::Enum => "enum",
-            Self::Open => "open",
             Self::Match => "match",
             Self::If => "if",
             Self::Else => "else",
@@ -192,7 +190,6 @@ impl TokenKind {
                 | Self::Type
                 | Self::Record
                 | Self::Enum
-                | Self::Open
                 | Self::Match
                 | Self::If
                 | Self::Else
@@ -232,7 +229,6 @@ pub const KEYWORDS: &[(&str, TokenKind)] = &[
     ("match", TokenKind::Match),
     ("module", TokenKind::Module),
     ("mut", TokenKind::Mut),
-    ("open", TokenKind::Open),
     ("pub", TokenKind::Pub),
     ("record", TokenKind::Record),
     ("requires", TokenKind::Requires),
