@@ -23,10 +23,10 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [x] Lexer test suite (33 tests)
 - [x] Layout pass: line break terminates a statement (spec v0.4)
 - [x] AST definitions
-- [ ] Parser: module header, `use`, `type`, `record`, `enum`
-- [ ] Parser: functions, effect rows, contracts
-- [ ] Parser: expressions with precedence, `match`, `for`, `while`, `?`
-- [ ] Parser error recovery producing multiple diagnostics per run
+- [x] Parser: module header, `use`, `type`, `record`, `enum`
+- [x] Parser: functions, effect rows, contracts
+- [x] Parser: expressions with precedence, `match`, `for`, `while`, `?`
+- [x] Parser error recovery producing multiple diagnostics per run
 - [x] Diagnostic type with stable codes, spans, in-scope names, ranked fixes
 - [x] JSON diagnostic emitter (`V0101`, `V0201`, …)
 - [ ] Canonical formatter (`vise fmt`), non-configurable
@@ -102,6 +102,9 @@ wrong and the repo should say so.
 | 2026-08-22 | String interpolation is validated by the lexer but split by the parser | Keeps the token stream flat and avoids a brace-depth stack in the lexer |
 | 2026-08-22 | Lexer emits `Newline`; a layout pass decides which ones matter | Keeps the rule in one testable place instead of spread through the parser |
 | 2026-08-22 | A line break terminates a statement; no semicolons | Resolves the §2 contradiction with no visible ceremony, and every spec example works unchanged |
+| 2026-08-22 | Record literals are banned in `if`/`while`/`for`/`match` headers | `if x { .. }` cannot otherwise be told from a record literal; parentheses re-enable them (Rust's rule) |
+| 2026-08-22 | Comparisons are non-associative | `a < b < c` would quietly compare a Bool with a number |
+| 2026-08-22 | Paths are a single segment; `::` is not parsed | The spec's examples use bare constructors (`Ok`, `CardDeclined`). See spec issue 4. |
 
 ## Open spec issues
 
@@ -122,6 +125,11 @@ Found while implementing; each needs a decision before the parser lands.
    anywhere in the spec, and §13 does not list them as absent. Either give them
    syntax or strike the word. The AST omits them until this is decided rather
    than guessing a form.
+
+4. **How are enum variants qualified?** The spec writes bare `Ok(..)` and
+   `CardDeclined(..)`, relying on imports and inference, and never uses `::`.
+   The lexer produces a `::` token that nothing parses. Either define qualified
+   paths or drop the token.
 
 ## Open questions
 
