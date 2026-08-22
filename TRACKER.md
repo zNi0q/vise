@@ -99,7 +99,8 @@ wrong and the repo should say so.
 | 2026-08-22 | Kept Rust ownership in full, reversing the GC decision | The borrow checker is the strongest mechanical verifier available, and annotation cost is tokens, not comprehension, for a machine author |
 | 2026-08-22 | Tokens are `Copy`: kind plus span, no payload | Text is recovered from the span, so the lexer allocates nothing |
 | 2026-08-22 | String interpolation is validated by the lexer but split by the parser | Keeps the token stream flat and avoids a brace-depth stack in the lexer |
-| 2026-08-22 | Lexer emits `Newline`; the parser decides whether it matters | **Open spec issue**: §2 calls layout insignificant, but Vise has no statement terminator. See "Open spec issues" below. |
+| 2026-08-22 | Lexer emits `Newline`; a layout pass decides which ones matter | Keeps the rule in one testable place instead of spread through the parser |
+| 2026-08-22 | A line break terminates a statement; no semicolons | Resolves the §2 contradiction with no visible ceremony, and every spec example works unchanged |
 
 ## Open spec issues
 
@@ -110,13 +111,10 @@ Found while implementing; each needs a decision before the parser lands.
    arithmetic) but the silent reading is the wrong one. Either accept and
    document it, or take a different comment syntax. Currently accepted, with a
    test pinning the behaviour.
-2. **No statement terminator, yet layout is called insignificant** (§2, §5).
-   Both cannot hold. `f\n(x)` is either one call or two statements, and that
-   is exactly the ambiguity §13 exists to forbid. Three ways out: make a line
-   break a terminator (Go's rule, no visible ceremony), require semicolons
-   (explicit, more typing), or keep layout insignificant and restrict the
-   grammar so no expression can continue across a line. The lexer currently
-   emits `Newline` so any of the three stays available.
+2. ~~No statement terminator, yet layout is called insignificant~~ —
+   **resolved in spec v0.4**: a line break ends a statement, with continuation
+   when the line is visibly unfinished. Go's rule, no visible ceremony, and
+   every example already in the spec works unchanged.
 
 ## Open questions
 

@@ -1,4 +1,4 @@
-# Vise Language Specification v0.3
+# Vise Language Specification v0.4
 
 **Vise lets an AI agent write software you don't have to read, because the
 compiler — not a human reviewer — guarantees what the code does and what it is
@@ -67,11 +67,41 @@ nothing else, and `user` cannot be passed where a `Cents` is expected.
 ## 2. Lexical
 
 UTF-8 source. Values are `snake_case`, types are `PascalCase`. Comments are
-`--` to end of line. Layout is insignificant; the formatter is canonical and
-non-configurable, so formatting is never a decision.
+`--` to end of line. The formatter is canonical and non-configurable, so
+formatting is never a decision.
 
 Literals: `42`, `1.5`, `true`, `'a'`, `"text"`. Strings interpolate with
 `"hello, {name}"`.
+
+Because a comment opens with `--`, `a --b` is a comment rather than a
+subtraction. Write `a - -b`; the formatter inserts the space.
+
+### Statement separation
+
+**A line break ends a statement.** There is no semicolon. A break does *not*
+end a statement when the statement is visibly unfinished:
+
+- the line ends on a token that cannot end an expression — an operator, `,`,
+  `=`, `->`, or an opening bracket;
+- the next line opens with a token that cannot begin a statement — `.`, `)`,
+  `]`, `}`, `,`, `else`, or a binary operator;
+- an unclosed `(` or `[` is still open.
+
+Braces are blocks, not brackets, so line breaks inside `{ }` stay significant.
+That is what separates record fields, enum variants, and statements:
+
+```
+let total = subtotal +      -- continues: the line ends on `+`
+            shipping
+let names = [
+  "ada",                    -- continues: inside an unclosed `[`
+  "alan",
+]
+```
+
+A terminator is required because the alternative is ambiguity: with no
+separator at all, `f` followed by `(x)` on the next line is either one call or
+two statements, and §13 exists to forbid exactly that.
 
 ## 3. Modules
 
