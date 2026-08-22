@@ -3,6 +3,7 @@
 pub mod code;
 pub mod diagnostic;
 pub mod json;
+pub mod render;
 pub mod span;
 
 pub use code::{Code, UnknownCode};

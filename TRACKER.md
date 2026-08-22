@@ -18,7 +18,7 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 
 ## M1 — Front end
 
-- [ ] Token definitions and spans
+- [~] Token definitions and spans
 - [ ] Lexer (incl. string interpolation, `--` comments)
 - [ ] Lexer test suite
 - [ ] AST definitions
@@ -26,8 +26,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [ ] Parser: functions, effect rows, contracts
 - [ ] Parser: expressions with precedence, `match`, `for`, `while`, `?`
 - [ ] Parser error recovery producing multiple diagnostics per run
-- [ ] Diagnostic type with stable codes, spans, in-scope names, ranked fixes
-- [ ] JSON diagnostic emitter (`V0101`, `V0201`, …)
+- [x] Diagnostic type with stable codes, spans, in-scope names, ranked fixes
+- [x] JSON diagnostic emitter (`V0101`, `V0201`, …)
 - [ ] Canonical formatter (`vise fmt`), non-configurable
 
 ## M2 — Types and effects
