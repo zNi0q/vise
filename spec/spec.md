@@ -84,7 +84,9 @@ end a statement when the statement is visibly unfinished:
 - the line ends on a token that cannot end an expression — an operator, `,`,
   `=`, `->`, or an opening bracket;
 - the next line opens with a token that cannot begin a statement — `.`, `)`,
-  `]`, `}`, `,`, `else`, or a binary operator;
+  `]`, `}`, `,`, `else`, or an infix-only operator such as `+`, `*`, or `==`.
+  `-`, `&`, and `!` are prefix operators too, so a line starting with one
+  begins a new statement; signal continuation from the end of the line above;
 - an unclosed `(` or `[` is still open.
 
 Braces are blocks, not brackets, so line breaks inside `{ }` stay significant.
