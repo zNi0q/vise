@@ -11,7 +11,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 
 - [x] Language specification v0.3 (`spec/spec.md`)
 - [x] Repository, `.gitignore`, commit conventions
-- [ ] Cargo workspace with the seven compiler crates
+- [x] Cargo workspace, zero third-party dependencies (`vise-diag` added
+      for shared diagnostics, so eight crates rather than seven)
 - [ ] `vise` CLI skeleton with `--json` diagnostics flag
 - [ ] CI: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`
 

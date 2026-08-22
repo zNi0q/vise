@@ -1,0 +1,28 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/n8bird/vise"
+rust-version = "1.85"
+
+# Vise has no third-party dependencies, by policy. A compiler whose own supply
+# chain is empty is easier to trust and easier to audit.
+[workspace.dependencies]
+vise-diag = { path = "crates/vise-diag" }
+vise-lex = { path = "crates/vise-lex" }
+vise-ast = { path = "crates/vise-ast" }
+vise-parse = { path = "crates/vise-parse" }
+vise-check = { path = "crates/vise-check" }
+vise-ir = { path = "crates/vise-ir" }
+vise-codegen = { path = "crates/vise-codegen" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
