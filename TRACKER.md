@@ -21,6 +21,7 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [x] Token definitions and spans
 - [x] Lexer (incl. string interpolation, `--` comments)
 - [x] Lexer test suite (33 tests)
+- [x] Layout pass: line break terminates a statement (spec v0.4)
 - [ ] AST definitions
 - [ ] Parser: module header, `use`, `type`, `record`, `enum`
 - [ ] Parser: functions, effect rows, contracts
