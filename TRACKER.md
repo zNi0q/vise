@@ -22,7 +22,7 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [x] Lexer (incl. string interpolation, `--` comments)
 - [x] Lexer test suite (33 tests)
 - [x] Layout pass: line break terminates a statement (spec v0.4)
-- [ ] AST definitions
+- [x] AST definitions
 - [ ] Parser: module header, `use`, `type`, `record`, `enum`
 - [ ] Parser: functions, effect rows, contracts
 - [ ] Parser: expressions with precedence, `match`, `for`, `while`, `?`
@@ -116,6 +116,12 @@ Found while implementing; each needs a decision before the parser lands.
    **resolved in spec v0.4**: a line break ends a statement, with continuation
    when the line is visibly unfinished. Go's rule, no visible ceremony, and
    every example already in the spec works unchanged.
+
+3. **Closures are referenced but never defined.** §4 says types are inferred
+   for "locals, closures, and private functions", but no closure syntax appears
+   anywhere in the spec, and §13 does not list them as absent. Either give them
+   syntax or strike the word. The AST omits them until this is decided rather
+   than guessing a form.
 
 ## Open questions
 
