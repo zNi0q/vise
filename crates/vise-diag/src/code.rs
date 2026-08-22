@@ -84,6 +84,17 @@ codes! {
     UnterminatedInterpolation = "V0005", "string interpolation is not closed",
         "An interpolation opened with `{` must close with `}` inside the same \
          string literal. To write a literal brace, escape it as `\\{`.";
+    NonSnakeCase = "V0006", "value name is not snake_case",
+        "Values are `[a-z_][a-z0-9_]*`. A camelCase name would otherwise lex as \
+         two tokens and fail somewhere confusing, so it is rejected where it is \
+         written. Rename it, or capitalise the first letter if a type was meant.";
+    NonPascalCase = "V0007", "type name is not PascalCase",
+        "Types are `[A-Z][A-Za-z0-9]*`, with no underscores. Casing is how the \
+         lexer tells a value from a type, so it is a rule rather than a style \
+         preference.";
+    UnterminatedChar = "V0008", "character literal is not closed",
+        "A character literal holds exactly one character and closes with `'` on \
+         the same line. `'a` with no closing quote is read as a lifetime.";
 
     // --- module structure and syntax ---------------------------------------
     ModuleTooLong = "V0101", "module exceeds the 500-line cap",

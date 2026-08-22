@@ -19,8 +19,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 ## M1 — Front end
 
 - [x] Token definitions and spans
-- [~] Lexer (incl. string interpolation, `--` comments)
-- [ ] Lexer test suite
+- [x] Lexer (incl. string interpolation, `--` comments)
+- [x] Lexer test suite (33 tests)
 - [ ] AST definitions
 - [ ] Parser: module header, `use`, `type`, `record`, `enum`
 - [ ] Parser: functions, effect rows, contracts
@@ -105,7 +105,12 @@ wrong and the repo should say so.
 
 Found while implementing; each needs a decision before the parser lands.
 
-1. **No statement terminator, yet layout is called insignificant** (§2, §5).
+1. **`--` comments make `a --b` a comment, not a subtraction.** Inherited
+   from Haskell's identical problem. A space disambiguates (`a - -b` is
+   arithmetic) but the silent reading is the wrong one. Either accept and
+   document it, or take a different comment syntax. Currently accepted, with a
+   test pinning the behaviour.
+2. **No statement terminator, yet layout is called insignificant** (§2, §5).
    Both cannot hold. `f\n(x)` is either one call or two statements, and that
    is exactly the ambiguity §13 exists to forbid. Three ways out: make a line
    break a terminator (Go's rule, no visible ceremony), require semicolons
