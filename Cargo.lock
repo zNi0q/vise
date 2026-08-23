@@ -15,6 +15,7 @@ version = "0.1.0"
 dependencies = [
  "vise-ast",
  "vise-diag",
+ "vise-parse",
 ]
 
 [[package]]

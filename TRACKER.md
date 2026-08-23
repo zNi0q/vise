@@ -33,8 +33,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 
 ## M2 — Types and effects
 
-- [ ] Name resolution over the closed namespace; `V0201` lists what is in scope
-- [ ] Module 500-line cap (`V0101`)
+- [x] Name resolution over the closed namespace; `V0201` lists what is in scope
+- [x] Module 500-line cap (`V0101`)
 - [ ] Hindley–Milner inference for locals and private functions
 - [ ] Distinct `type` declarations (nominal, not aliases)
 - [ ] Parametric generics
