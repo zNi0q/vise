@@ -1,0 +1,5 @@
+module effects
+
+fn log_total(amount: Int) !{} {
+  print("total: {amount}")
+}

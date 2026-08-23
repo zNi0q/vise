@@ -40,8 +40,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [ ] Parametric generics
 - [ ] Exhaustiveness checking for `match` (`V0301`)
 - [ ] Unused-`Result` detection (`V0501`)
-- [ ] Effect inference, bottom-up
-- [ ] Effect row checking against declarations (`V0401`)
+- [x] Effect inference, bottom-up (call-graph fixpoint)
+- [x] Effect row checking against declarations (`V0401`, `V0402`)
 - [ ] `vise fix` writes inferred effect rows into signatures
 
 ## M3 — Falsification gate
@@ -141,6 +141,16 @@ Found while implementing; each needs a decision before the parser lands.
    inner scope may shadow an outer one, and redeclaring within one scope is
    `V0203`. The spec says nothing. Shadowing is a real source of
    plausible-but-wrong reads, so forbidding it outright is defensible.
+
+7. **How does a caller learn an imported function's effects?** There is no
+   module system, so `use std/http@1:{post}` brings in a name with no
+   signature. Effect checking is therefore one-sided for any function that
+   calls an import: `V0401` still fires for effects that are known, but
+   `V0402` ("declared but never performed") is suppressed, because absence of
+   proof is not proof of absence. Needs a module system, or signatures
+   published alongside imports.
+8. **Method calls are assumed pure.** `.clone()` is, but nothing enforces that
+   for any other method. Becomes a real lookup once types exist.
 
 ## Open questions
 
