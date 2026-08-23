@@ -12,6 +12,7 @@ vise — a language whose author is a machine
 
 usage:
   vise check <file.vise> [--json]  parse, resolve, and type-check
+  vise run <file.vise>             check, then run `main`
   vise fix <file.vise> [--dry-run] apply every unambiguous fix
   vise parse <file.vise> [--json]  parse only
   vise lex <file.vise> [--json]    tokenise only
@@ -47,6 +48,7 @@ fn main() -> ExitCode {
         ["parse", path, "--json"] | ["parse", "--json", path] => run(path, Stage::Parse, true),
         ["check", path] => run(path, Stage::Check, false),
         ["check", path, "--json"] | ["check", "--json", path] => run(path, Stage::Check, true),
+        ["run", path] => run_file(path),
         ["fix", path] => fix_file(path, false),
         ["fix", path, "--dry-run"] | ["fix", "--dry-run", path] => fix_file(path, true),
         _ => {
@@ -159,6 +161,49 @@ fn run(path: &str, stage: Stage, as_json: bool) -> ExitCode {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+/// Check, then execute `main`.
+fn run_file(path: &str) -> ExitCode {
+    let text = match read(path) {
+        Ok(t) => t,
+        Err(code) => return code,
+    };
+
+    let mut map = SourceMap::new();
+    let file = map.add(path, text.clone());
+    let parsed = vise_parse::parse(&text, file);
+    let a = analyze(path, &text, Stage::Check);
+
+    // Running code the checker rejected would report a runtime failure for
+    // something already explained statically.
+    if a.errors() > 0 {
+        print!("{}", render::report(&a.diagnostics, &a.map));
+        eprintln!("not running: {} error(s)", a.errors());
+        return ExitCode::FAILURE;
+    }
+    print!("{}", render::report(&a.diagnostics, &a.map));
+
+    let Some(module) = &parsed.module else {
+        return ExitCode::FAILURE;
+    };
+    let outcome = vise_interp::run(module);
+    // Print what ran before reporting how it ended.
+    for line in &outcome.stdout {
+        println!("{line}");
+    }
+    match outcome.result {
+        Ok(value) => {
+            if value != vise_interp::Value::Unit {
+                println!("=> {value}");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(trap) => {
+            eprintln!("trap: {trap}");
+            ExitCode::FAILURE
+        }
     }
 }
 

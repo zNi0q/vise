@@ -50,8 +50,9 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 
 **This milestone decides whether the project continues.**
 
-- [ ] Tree-walking interpreter (throwaway; exists to run the benchmark early)
-- [ ] `core` builtins: `List`, `Map`, `Set`, `Option`, `Result`, `print`
+- [x] Tree-walking interpreter (throwaway; exists to run the benchmark early)
+- [~] `core` builtins: `List`, `Option`, `Result`, `print` done; `Map` and
+      `Set` have no literal syntax yet
 - [ ] Benchmark harness: N tasks solved by an agent in Vise and in TypeScript
 - [ ] Metrics: iterations-to-green, hallucinated-API rate, tokens per solve
 - [ ] Task set covering graph-shaped data — the case most likely to fail

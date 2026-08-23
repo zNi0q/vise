@@ -1,24 +1,17 @@
 [package]
-name = "vise-cli"
+name = "vise-interp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[[bin]]
-name = "vise"
-path = "src/main.rs"
-
 [dependencies]
-vise-diag.workspace = true
-vise-lex.workspace = true
 vise-ast.workspace = true
+
+[dev-dependencies]
 vise-parse.workspace = true
-vise-check.workspace = true
-vise-ir.workspace = true
-vise-codegen.workspace = true
-vise-interp.workspace = true
+vise-diag.workspace = true
 
 [lints]
 workspace = true
