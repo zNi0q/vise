@@ -614,7 +614,10 @@ impl Parser<'_> {
                 let digits = raw.replace('_', "");
                 match digits.parse::<i64>() {
                     Ok(v) => Literal::Int(v),
-                    Err(_) => {
+                    // Only a genuine overflow is reported here. If the text is
+                    // not all digits the lexer already rejected it, and saying
+                    // so twice is two diagnostics for one mistake.
+                    Err(_) if digits.bytes().all(|b| b.is_ascii_digit()) => {
                         self.error(
                             Code::MalformedNumber,
                             tok.span,
@@ -622,6 +625,7 @@ impl Parser<'_> {
                         );
                         Literal::Int(0)
                     }
+                    Err(_) => Literal::Int(0),
                 }
             }
             T::Float => Literal::Float(raw.replace('_', "")),
