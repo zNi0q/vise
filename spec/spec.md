@@ -1,4 +1,4 @@
-# Vise Language Specification v0.4
+# Vise Language Specification v0.5
 
 **Vise lets an AI agent write software you don't have to read, because the
 compiler — not a human reviewer — guarantees what the code does and what it is
@@ -149,6 +149,14 @@ enum ChargeError {
 
 `type` creates a **distinct** type: a `UserId` is not an `Int`, so swapped
 arguments are a type error rather than a silent bug.
+
+One narrow exception keeps that usable: **a numeric literal adopts the type of
+the other operand.** `amount / 50` and `amount > 0` work when `amount` is
+declared over `Int`, and arithmetic on such a type yields that type. Two
+*named* types never mix — `Cents + UserId` is an error — and a bare literal
+passed where a named type is expected is still an error, because an argument
+position is exactly where swapping happens. Only a literal, which belongs to no
+domain, may take one on.
 
 Generics are parametric — `fn first<T>(xs: List<T>) -> Option<T>`. No traits,
 no overloading: one name resolves to exactly one definition.

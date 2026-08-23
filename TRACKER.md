@@ -35,9 +35,9 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 
 - [x] Name resolution over the closed namespace; `V0201` lists what is in scope
 - [x] Module 500-line cap (`V0101`)
-- [ ] Hindley–Milner inference for locals and private functions
-- [ ] Distinct `type` declarations (nominal, not aliases)
-- [ ] Parametric generics
+- [x] Type inference for locals and private functions (unification)
+- [x] Distinct `type` declarations (nominal, not aliases)
+- [x] Parametric generics
 - [x] Exhaustiveness checking for `match` (`V0301`) — conservative: descends
       into single-field constructors only, never reports a false positive
 - [x] Unused-`Result` detection (`V0501`) — limited to calls whose return
@@ -107,6 +107,7 @@ wrong and the repo should say so.
 | 2026-08-22 | Record literals are banned in `if`/`while`/`for`/`match` headers | `if x { .. }` cannot otherwise be told from a record literal; parentheses re-enable them (Rust's rule) |
 | 2026-08-22 | Comparisons are non-associative | `a < b < c` would quietly compare a Bool with a number |
 | 2026-08-22 | Paths are a single segment; `::` is not parsed | The spec's examples use bare constructors (`Ok`, `CardDeclined`). See spec issue 4. |
+| 2026-08-23 | A numeric literal adopts the other operand's type | Resolves a contradiction between §4 (distinct types) and §10 (whose `fee` example did arithmetic between `Cents` and integer literals). Narrowest rule that works: named types still never mix. |
 
 ## Open spec issues
 

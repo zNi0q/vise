@@ -1,0 +1,17 @@
+module swapped
+
+type UserId = Int
+type Cents = Int
+
+record Receipt {
+  id: UserId
+  amount: Cents
+}
+
+fn charge(user: UserId, amount: Cents) -> Receipt {
+  Receipt { id: user, amount: amount }
+}
+
+fn run(user: UserId, amount: Cents) -> Receipt {
+  charge(amount, user)
+}
