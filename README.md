@@ -85,13 +85,28 @@ bench/            the experiment: agent repair-iteration harness
 
 ## Status
 
-Spec v0.4. The front end runs: `vise lex` and `vise parse` accept the full
-language and report diagnostics as text or JSON. Nothing is type-checked yet.
+Spec v0.4. The front end runs, and the closed namespace is enforced: `vise
+lex`, `vise parse`, and `vise check` accept the full language and report
+diagnostics as text or JSON. Types, effects, and ownership are not checked yet.
+
+The central claim, working:
 
 ```
-$ vise parse examples/payments.vise
-module payments: 1 import(s), 6 item(s)
+$ vise check examples/hallucinated.vise
+error[V0201]: `fetch_user` is not in scope
+  --> examples/hallucinated.vise:6:18
+   |
+ 6 |   let response = fetch_user(id)
+   |                  ^^^^^^^^^^
+   = note: a name must be defined in this module or listed in a `use`;
+           there is no glob import
+   = in scope: Bool, Char, Err, Float, Int, List, Map, None, Ok, Option,
+               Result, Set, Some, Str, Unit, charge_user, id, post, print
+   = fix (likely): replace `charge_user`
 ```
+
+A hallucinated API is a compile error, and the diagnostic hands back every name
+that does exist rather than refusing the one that does not.
 
 ## Roadmap
 
@@ -101,8 +116,8 @@ module payments: 1 import(s), 6 item(s)
    tree-walking interpreter first so this can run before the real backend
    exists. *If the numbers are flat here, the thesis is wrong and we should
    know that in week two, not month six.*
-3. **Compiler front end** — ~~lexer~~, ~~parser~~, type inference, borrow
-   checker, effect inference.
+3. **Compiler front end** — ~~lexer~~, ~~parser~~, ~~name resolution~~, type
+   inference, borrow checker, effect inference.
 4. **Runtime** — capability gate, allocator, trace record/replay, scheduler.
 5. **Native backend** — Cranelift or C emission.
 

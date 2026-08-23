@@ -1,0 +1,8 @@
+module hallucinated
+
+use std/http@1:{post}
+
+fn charge_user(id: Int) -> Int {
+  let response = fetch_user(id)
+  charge_usr(response)
+}

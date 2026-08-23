@@ -13,6 +13,7 @@ vise — a language whose author is a machine
 usage:
   vise lex <file.vise> [--json]   tokenise a file and report diagnostics
   vise parse <file.vise> [--json] parse a file and report diagnostics
+  vise check <file.vise> [--json] parse and resolve names
   vise explain <CODE>             explain a diagnostic code, e.g. V0401
   vise explain --list             list every diagnostic code
   vise help                       show this message
@@ -43,6 +44,8 @@ fn main() -> ExitCode {
         ["lex", path, "--json"] | ["lex", "--json", path] => lex_file(path, true),
         ["parse", path] => parse_file(path, false),
         ["parse", path, "--json"] | ["parse", "--json", path] => parse_file(path, true),
+        ["check", path] => check_file(path, false),
+        ["check", path, "--json"] | ["check", "--json", path] => check_file(path, true),
         _ => {
             eprint!("{USAGE}");
             ExitCode::from(2)
@@ -97,6 +100,50 @@ fn parse_file(path: &str, as_json: bool) -> ExitCode {
     }
 
     if parsed.has_errors() {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+fn check_file(path: &str, as_json: bool) -> ExitCode {
+    let text = match read(path) {
+        Ok(t) => t,
+        Err(code) => return code,
+    };
+
+    let mut map = SourceMap::new();
+    let file = map.add(path, text.clone());
+    let parsed = vise_parse::parse(&text, file);
+    let mut diagnostics = parsed.diagnostics;
+
+    // Resolution needs a tree, so it only runs once parsing produced one.
+    if let Some(module) = &parsed.module {
+        let lines = map.file(file).line_count();
+        if let Some(d) = vise_check::check_module_length(lines, module.name.span) {
+            diagnostics.push(d);
+        }
+        diagnostics.extend(vise_check::resolve(module));
+    }
+
+    let errors = diagnostics.iter().filter(|d| d.is_error()).count();
+    if as_json {
+        println!("{}", json::report(&diagnostics, &map));
+    } else {
+        print!("{}", render::report(&diagnostics, &map));
+        if errors == 0
+            && let Some(m) = &parsed.module
+        {
+            println!(
+                "module {}: {} import(s), {} item(s), all names resolved",
+                m.name,
+                m.uses.len(),
+                m.items.len()
+            );
+        }
+    }
+
+    if errors > 0 {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
