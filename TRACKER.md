@@ -131,6 +131,17 @@ Found while implementing; each needs a decision before the parser lands.
    The lexer produces a `::` token that nothing parses. Either define qualified
    paths or drop the token.
 
+5. **`core` is never enumerated.** §3 shows six names marked "implicit; shown
+   for clarity" and §1 calls `print` without importing it, but the spec never
+   says what `core` contains. The closed namespace is the mechanism behind
+   `V0201`, and "what is in scope" has no answer without this list.
+   `crates/vise-check/src/prelude.rs` holds a provisional core covering exactly
+   what the worked examples use.
+6. **Is shadowing allowed?** The implementation currently follows Rust: an
+   inner scope may shadow an outer one, and redeclaring within one scope is
+   `V0203`. The spec says nothing. Shadowing is a real source of
+   plausible-but-wrong reads, so forbidding it outright is defensible.
+
 ## Open questions
 
 Tracked in `README.md`. The load-bearing one is whether the borrow checker
