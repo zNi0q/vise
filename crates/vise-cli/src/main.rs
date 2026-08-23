@@ -126,6 +126,7 @@ fn check_file(path: &str, as_json: bool) -> ExitCode {
         diagnostics.extend(vise_check::resolve(module));
         diagnostics.extend(vise_check::check_effects(module));
         diagnostics.extend(vise_check::check_exhaustive(module));
+        diagnostics.extend(vise_check::check_results(module));
     }
 
     let errors = diagnostics.iter().filter(|d| d.is_error()).count();

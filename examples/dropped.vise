@@ -1,0 +1,11 @@
+module dropped
+
+fn save(amount: Int) -> Result<Int, Str> {
+  Ok(amount)
+}
+
+fn run(amounts: List<Int>) {
+  for a in amounts {
+    save(a)
+  }
+}

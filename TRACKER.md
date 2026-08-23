@@ -40,7 +40,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [ ] Parametric generics
 - [x] Exhaustiveness checking for `match` (`V0301`) — conservative: descends
       into single-field constructors only, never reports a false positive
-- [ ] Unused-`Result` detection (`V0501`)
+- [x] Unused-`Result` detection (`V0501`) — limited to calls whose return
+      type is declared in this module
 - [x] Effect inference, bottom-up (call-graph fixpoint)
 - [x] Effect row checking against declarations (`V0401`, `V0402`)
 - [ ] `vise fix` writes inferred effect rows into signatures
