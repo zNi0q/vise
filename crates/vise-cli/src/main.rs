@@ -118,6 +118,7 @@ fn analyze(path: &str, text: &str, stage: Stage) -> Analysis {
             diagnostics.extend(vise_check::check_exhaustive(module));
             diagnostics.extend(vise_check::check_results(module));
             diagnostics.extend(vise_check::check_types(module));
+            diagnostics.extend(vise_check::check_borrows(module));
         }
         summary = Some(format!(
             "module {}: {} import(s), {} item(s)",

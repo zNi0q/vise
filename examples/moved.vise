@@ -1,0 +1,24 @@
+module moved
+
+record Order {
+  total: Int
+}
+
+fn load() -> List<Order> {
+  [Order { total: 10 }]
+}
+
+fn summarise(orders: &List<Order>) -> Int {
+  0
+}
+
+fn archive(orders: List<Order>) -> Int {
+  0
+}
+
+fn main() {
+  let orders = load()
+  let count = summarise(&orders)
+  let done = archive(orders)
+  let again = archive(orders)
+}

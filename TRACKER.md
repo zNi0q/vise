@@ -64,9 +64,9 @@ wrong and the repo should say so.
 
 ## M4 — Ownership
 
-- [ ] Move checking; use-after-move (`V0601`) names the move site
-- [ ] Borrow checking, shared-xor-mutable (`V0602`)
-- [ ] Borrow-outlives-owner (`V0603`)
+- [x] Move checking; use-after-move (`V0601`) names the move site
+- [x] Borrow checking, shared-xor-mutable (`V0602`) — within one call
+- [x] Borrow-outlives-owner (`V0603`) — returning a borrow of a local
 - [ ] Lifetime inference across function bodies
 - [ ] Signature elision rules; `V0604` when genuinely ambiguous
 - [ ] `vise fix` writes lifetime annotations

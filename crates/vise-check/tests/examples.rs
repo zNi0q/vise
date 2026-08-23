@@ -28,6 +28,8 @@ const EXPECTED: &[(&str, &[&str])] = &[
     ("dropped.vise", &["V0501"]),
     // Swapped arguments, caught by distinct types.
     ("swapped.vise", &["V0302", "V0302"]),
+    // A value used after it was handed away.
+    ("moved.vise", &["V0601"]),
 ];
 
 fn examples_dir() -> PathBuf {
@@ -51,6 +53,7 @@ fn diagnose(path: &str, text: &str) -> Vec<String> {
         out.extend(vise_check::check_exhaustive(module));
         out.extend(vise_check::check_results(module));
         out.extend(vise_check::check_types(module));
+        out.extend(vise_check::check_borrows(module));
     }
     out.iter().map(|d| d.code.as_str().to_owned()).collect()
 }
