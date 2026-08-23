@@ -83,6 +83,11 @@ runtime/asm       context switch, trampoline
 bench/            the experiment: agent repair-iteration harness
 ```
 
+## Licence
+
+Dual licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE), at your
+option.
+
 ## Status
 
 Spec v0.4. The front end runs, and the closed namespace is enforced: `vise
