@@ -44,7 +44,7 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
       type is declared in this module
 - [x] Effect inference, bottom-up (call-graph fixpoint)
 - [x] Effect row checking against declarations (`V0401`, `V0402`)
-- [ ] `vise fix` writes inferred effect rows into signatures
+- [x] `vise fix` applies every unambiguous fix, effect rows included
 
 ## M3 — Falsification gate
 

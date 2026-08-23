@@ -108,6 +108,11 @@ error[V0201]: `fetch_user` is not in scope
 A hallucinated API is a compile error, and the diagnostic hands back every name
 that does exist rather than refusing the one that does not.
 
+`vise fix` applies the unambiguous ones — a lone `Certain` suggestion, such as
+the exactly-widened effect row. It deliberately declines anything else: the
+rename above is offered to a reader but never applied unattended, because
+guessing which name was meant is the author's decision.
+
 ## Roadmap
 
 1. **Spec** — v0.4, and the thing to argue with first.
