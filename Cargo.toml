@@ -6,7 +6,7 @@ members = ["crates/*"]
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/abdullah4tech/vise"
+repository = "https://github.com/zNi0q/vise"
 rust-version = "1.85"
 
 # Vise has no third-party dependencies, by policy. A compiler whose own supply
