@@ -1,0 +1,13 @@
+module incomplete
+
+enum ChargeError {
+  InsufficientFunds
+  CardDeclined(reason: Str)
+}
+
+fn describe(r: Result<Int, ChargeError>) -> Int {
+  match r {
+    Ok(amount) -> amount
+    Err(CardDeclined(why)) -> 0
+  }
+}

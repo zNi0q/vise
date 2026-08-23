@@ -13,7 +13,7 @@ vise — a language whose author is a machine
 usage:
   vise lex <file.vise> [--json]   tokenise a file and report diagnostics
   vise parse <file.vise> [--json] parse a file and report diagnostics
-  vise check <file.vise> [--json] parse, resolve names, check effects
+  vise check <file.vise> [--json] parse, resolve, check effects and matches
   vise explain <CODE>             explain a diagnostic code, e.g. V0401
   vise explain --list             list every diagnostic code
   vise help                       show this message
@@ -125,6 +125,7 @@ fn check_file(path: &str, as_json: bool) -> ExitCode {
         }
         diagnostics.extend(vise_check::resolve(module));
         diagnostics.extend(vise_check::check_effects(module));
+        diagnostics.extend(vise_check::check_exhaustive(module));
     }
 
     let errors = diagnostics.iter().filter(|d| d.is_error()).count();
@@ -136,7 +137,7 @@ fn check_file(path: &str, as_json: bool) -> ExitCode {
             && let Some(m) = &parsed.module
         {
             println!(
-                "module {}: {} import(s), {} item(s), names and effects check out",
+                "module {}: {} import(s), {} item(s), checks pass",
                 m.name,
                 m.uses.len(),
                 m.items.len()

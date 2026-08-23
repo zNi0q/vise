@@ -38,7 +38,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [ ] Hindley–Milner inference for locals and private functions
 - [ ] Distinct `type` declarations (nominal, not aliases)
 - [ ] Parametric generics
-- [ ] Exhaustiveness checking for `match` (`V0301`)
+- [x] Exhaustiveness checking for `match` (`V0301`) — conservative: descends
+      into single-field constructors only, never reports a false positive
 - [ ] Unused-`Result` detection (`V0501`)
 - [x] Effect inference, bottom-up (call-graph fixpoint)
 - [x] Effect row checking against declarations (`V0401`, `V0402`)
