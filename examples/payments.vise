@@ -1,0 +1,28 @@
+module payments
+
+use std/http@1:{post}
+
+type UserId = Int
+type Cents = Int
+
+record Receipt {
+  id: UserId
+  amount: Cents
+}
+
+enum ChargeError {
+  InsufficientFunds
+  CardDeclined(reason: Str)
+}
+
+fn fee(amount: Cents) -> Cents
+  requires amount > 0
+  ensures result >= 0
+{
+  amount / 50
+}
+
+pub fn charge(user: UserId, amount: Cents) -> Result<Receipt, ChargeError> !{net} {
+  let quote = post("/quote", user)?
+  Ok(Receipt { id: user, amount: quote + fee(amount) })
+}

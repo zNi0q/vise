@@ -85,18 +85,24 @@ bench/            the experiment: agent repair-iteration harness
 
 ## Status
 
-Spec v0.3 drafted. Nothing is implemented yet.
+Spec v0.4. The front end runs: `vise lex` and `vise parse` accept the full
+language and report diagnostics as text or JSON. Nothing is type-checked yet.
+
+```
+$ vise parse examples/payments.vise
+module payments: 1 import(s), 6 item(s)
+```
 
 ## Roadmap
 
-1. **Spec** — v0.3, and the thing to argue with first.
+1. **Spec** — v0.4, and the thing to argue with first.
 2. **Benchmark harness** — N tasks, an agent solves each in Vise and in
    TypeScript, measure iterations-to-green and hallucinated-API rate. Build a
    tree-walking interpreter first so this can run before the real backend
    exists. *If the numbers are flat here, the thesis is wrong and we should
    know that in week two, not month six.*
-3. **Compiler front end** — lexer, parser, type inference, borrow checker,
-   effect inference.
+3. **Compiler front end** — ~~lexer~~, ~~parser~~, type inference, borrow
+   checker, effect inference.
 4. **Runtime** — capability gate, allocator, trace record/replay, scheduler.
 5. **Native backend** — Cranelift or C emission.
 
