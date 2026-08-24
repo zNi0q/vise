@@ -1,0 +1,39 @@
+# Maintainer: see the repository
+#
+# Build with: makepkg -si
+pkgname=vise
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A programming language whose author is a machine"
+arch=('x86_64' 'aarch64')
+url="https://github.com/zNi0q/vise"
+license=('MIT' 'Apache')
+# gcc is not optional: the build script compiles the C runtime, and `vise build`
+# shells out to a C compiler to produce a binary.
+makedepends=('rust' 'cargo' 'gcc')
+depends=('gcc-libs')
+optdepends=('gcc: required for `vise build` to produce native binaries')
+source=("$pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --release --frozen
+}
+
+check() {
+    cd "$srcdir/$pkgname"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo test --release --frozen
+}
+
+package() {
+    cd "$srcdir/$pkgname"
+    install -Dm755 target/release/vise "$pkgdir/usr/bin/vise"
+    install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
+    install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 spec/spec.md "$pkgdir/usr/share/doc/$pkgname/spec.md"
+}

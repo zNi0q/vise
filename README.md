@@ -91,6 +91,47 @@ runtime/asm       context switch, trampoline
 bench/            the experiment: agent repair-iteration harness
 ```
 
+## Installing
+
+Needs Rust and a C compiler: the build compiles the C runtime, and `vise build`
+shells out to a C compiler to produce a binary.
+
+```sh
+git clone https://github.com/zNi0q/vise && cd vise
+./install.sh                    # to ~/.local/bin
+PREFIX=/usr/local ./install.sh  # or somewhere else
+./install.sh --uninstall
+```
+
+`make install` does the same thing. On Arch, `packaging/PKGBUILD` builds a
+package with `makepkg -si`.
+
+## Using it
+
+```
+vise repl                  an interactive session
+vise run file.vise         check, then interpret
+vise build file.vise       check, then compile to a native binary
+vise check file.vise       all checks; --json for machine-readable diagnostics
+vise fmt file.vise         rewrite in canonical form
+vise fix file.vise         apply every unambiguous fix
+vise explain V0401         why a rule exists
+```
+
+The REPL rebuilds a whole module around each input and replays the session from
+the start, which is invisible only because a Vise program is deterministic
+(§11):
+
+```
+vise> fn double(n: Int) -> Int { n * 2 }
+vise> var total = 0
+vise> for n in [1, 2, 3] { total = total + n }
+vise> double(total)
+12
+vise> :type total
+total : Int
+```
+
 ## Licence
 
 Dual licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE), at your

@@ -3,6 +3,8 @@
 //! Argument parsing is hand-written, matching the workspace's
 //! no-third-party-dependency policy.
 
+mod repl;
+
 use std::process::ExitCode;
 
 use vise_diag::{Code, Diagnostic, SourceMap, json, render};
@@ -12,6 +14,7 @@ vise — a language whose author is a machine
 
 usage:
   vise check <file.vise> [--json]  parse, resolve, and type-check
+  vise repl                        start an interactive session
   vise run <file.vise>             check, then run `main`
   vise build <file.vise> [-o out]  check, then compile to a native binary
   vise fix <file.vise> [--dry-run] apply every unambiguous fix
@@ -50,6 +53,7 @@ fn main() -> ExitCode {
         ["parse", path, "--json"] | ["parse", "--json", path] => run(path, Stage::Parse, true),
         ["check", path] => run(path, Stage::Check, false),
         ["check", path, "--json"] | ["check", "--json", path] => run(path, Stage::Check, true),
+        ["repl"] => repl::run(),
         ["run", path] => run_file(path),
         ["build", path] => build_file(path, None),
         ["build", path, "-o", out] | ["build", "-o", out, path] => build_file(path, Some(out)),

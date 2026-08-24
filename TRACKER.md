@@ -87,6 +87,13 @@ wrong and the repo should say so.
 - [x] Deterministic softfloat for transcendentals (`runtime/c/softfloat.c`)
 - [ ] Proof that static effect rows and runtime confinement agree
 
+## M7 — Distribution and tooling
+
+- [x] `install.sh`, `Makefile`, and an Arch `PKGBUILD`
+- [x] `vise repl`, with session replay, `:type`, `:list`, `:save`, `:reset`
+- [ ] Line editing and history in the REPL (needs a terminal library, which the
+      no-dependency policy currently forbids)
+
 ## M6 — Native backend
 
 - [x] ~~IR definition~~ — not needed for one backend, see decisions
