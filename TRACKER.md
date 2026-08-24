@@ -151,7 +151,9 @@ Found while implementing; each needs a decision before the parser lands.
    The lexer produces a `::` token that nothing parses. Either define qualified
    paths or drop the token.
 
-5. **`core` is never enumerated.** §3 shows six names marked "implicit; shown
+5. ~~`core` is never enumerated~~ — **fixed**. `crates/vise-check/src/builtins.rs`
+   is the single table every stage reads, and a test asserts the interpreter
+   implements all of it. Original issue:  §3 shows six names marked "implicit; shown
    for clarity" and §1 calls `print` without importing it, but the spec never
    says what `core` contains. The closed namespace is the mechanism behind
    `V0201`, and "what is in scope" has no answer without this list.
@@ -188,6 +190,15 @@ Found while implementing; each needs a decision before the parser lands.
     existed, and was right to, since §0 declares the document complete. The
     closed-world rule worked; the document did not. §4 now has an operator
     table.
+
+11. **A bare assignment cannot be a match arm.** An arm is an expression, so
+    `None -> out = append(...)` is a syntax error. Using the match as an
+    expression is better style anyway, but the diagnostic does not suggest it.
+    Hit independently by a benchmark agent and while writing `growth`.
+12. **The interpreter is too slow for a large filesystem walk.** `growth` on a
+    tree of tens of thousands of files does not finish in minutes. The fix is
+    the native backend, which currently refuses the `fs` builtins because they
+    have no C implementations.
 
 ## Open questions
 

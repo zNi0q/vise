@@ -160,14 +160,17 @@ impl Checker {
                 fields: Vec::new(),
             },
         );
-        c.fns.insert(
-            "print".into(),
-            Sig {
-                generics: Vec::new(),
-                params: vec![Ty::con("Str")],
-                ret: Ty::unit(),
-            },
-        );
+        // Every `core` function, from the one table all stages read.
+        for b in crate::builtins::all() {
+            c.fns.insert(
+                b.name.to_owned(),
+                Sig {
+                    generics: b.generics,
+                    params: b.params,
+                    ret: b.ret,
+                },
+            );
+        }
 
         for item in &module.items {
             match &item.kind {
@@ -247,7 +250,13 @@ impl Checker {
     fn to_ty(&self, ty: &Type) -> Ty {
         match &ty.kind {
             TypeKind::Unit => Ty::unit(),
-            TypeKind::Ref { is_mut, inner, .. } => Ty::borrow(self.to_ty(inner), *is_mut),
+            // `&T` has the same type as `T`. Vise values are immutable and
+            // structurally shared, so a borrow cannot observe anything an owned
+            // value cannot: the interpreter treats it as transparent and the
+            // backend lowers it to the same C type. What `&` records is that
+            // ownership does not transfer, which is the borrow checker's
+            // business, not the type checker's.
+            TypeKind::Ref { inner, .. } => self.to_ty(inner),
             TypeKind::Named { name, args } => {
                 let args: Vec<Ty> = args.iter().map(|a| self.to_ty(a)).collect();
                 Ty::Con(name.name.clone(), args)
@@ -550,7 +559,8 @@ impl Checker {
                 }
             }
             ExprKind::Binary { op, lhs, rhs } => self.binary(*op, lhs, rhs, e.span),
-            ExprKind::Borrow { is_mut, operand } => Ty::borrow(self.expr(operand), *is_mut),
+            // See `to_ty`: borrowing does not change a value's type.
+            ExprKind::Borrow { operand, .. } => self.expr(operand),
             ExprKind::Try(inner) => {
                 let t = self.expr(inner);
                 match self.table.shallow(&t) {

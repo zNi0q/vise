@@ -199,35 +199,50 @@ impl Checker {
                 body,
             } => {
                 self.expr(iter, Usage::Read);
+                let already = self.moved_names();
                 self.depth += 1;
                 if let Binding::Name(ident) = binding {
                     self.declare(&ident.name, Ownership::Unknown);
                 }
                 self.block(body, false);
                 self.depth -= 1;
-                self.settle_loop();
+                self.settle_loop(&already);
             }
             StmtKind::While { cond, body } => {
                 self.expr(cond, Usage::Read);
+                let already = self.moved_names();
                 self.depth += 1;
                 self.block(body, false);
                 self.depth -= 1;
-                self.settle_loop();
+                self.settle_loop(&already);
             }
             StmtKind::Expr(e) => self.expr(e, Usage::Read),
         }
     }
 
+    /// Names already moved, so a later loop can tell its own moves apart from
+    /// ones that happened before it.
+    fn moved_names(&self) -> BTreeSet<String> {
+        self.locals
+            .iter()
+            .filter(|(_, l)| l.moved.is_some())
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
     /// A value declared outside a loop and moved inside it would already be
     /// gone on the second iteration.
-    fn settle_loop(&mut self) {
+    ///
+    /// `already` is what was moved before the loop began: those moves happen
+    /// once, not once per iteration, and reporting them was a false positive.
+    fn settle_loop(&mut self, already: &BTreeSet<String>) {
         let depth = self.depth;
         let offenders: Vec<(String, Span)> = self
             .locals
             .iter()
             .filter_map(|(name, l)| {
                 let moved = l.moved?;
-                (l.depth <= depth).then(|| (name.clone(), moved))
+                (l.depth <= depth && !already.contains(name)).then(|| (name.clone(), moved))
             })
             .collect();
 
@@ -478,7 +493,6 @@ impl Checker {
     /// `Unknown`, and an `Unknown` local is never reported on.
     fn ownership_of_expr(&self, e: &Expr) -> Ownership {
         match &e.kind {
-            ExprKind::Literal(Literal::Str(_)) => Ownership::Move,
             ExprKind::Literal(_) => Ownership::Copy,
             ExprKind::ListLit(_) | ExprKind::RecordLit { .. } => Ownership::Move,
             ExprKind::Borrow { is_mut, .. } => {
@@ -549,8 +563,12 @@ fn ownership_of(ty: &Type) -> Ownership {
             }
         }
         TypeKind::Named { name, args } => match name.name.as_str() {
-            "Int" | "Float" | "Bool" | "Char" | "Unit" => Ownership::Copy,
-            "Str" | "List" | "Map" | "Set" | "Option" | "Result" => Ownership::Move,
+            // §4 lists `Str` among the primitives, and §9 says primitives copy
+            // implicitly. A string is immutable and shared, so a copy is a
+            // refcount bump — treating it as a move made every helper that
+            // takes one consume it, which no ordinary program survives.
+            "Int" | "Float" | "Bool" | "Char" | "Unit" | "Str" => Ownership::Copy,
+            "List" | "Map" | "Set" | "Option" | "Result" => Ownership::Move,
             // A user type: a record or enum owns its contents.
             _ if args.is_empty() && name.name.starts_with(char::is_uppercase) => Ownership::Unknown,
             _ => Ownership::Unknown,

@@ -152,6 +152,10 @@ pub enum Trap {
     /// A construct the interpreter does not implement. Named rather than
     /// silently producing a wrong answer.
     Unsupported(String),
+    /// `exit(n)`. Not a failure: it unwinds like one because that is how a
+    /// program stops from the middle of itself, and the caller turns it back
+    /// into a status code.
+    Exit(i64),
 }
 
 impl fmt::Display for Trap {
@@ -170,6 +174,7 @@ impl fmt::Display for Trap {
             }
             Self::NoMatchingArm => f.write_str("no match arm applied"),
             Self::Unsupported(what) => write!(f, "unsupported: {what}"),
+            Self::Exit(code) => write!(f, "exit({code})"),
         }
     }
 }

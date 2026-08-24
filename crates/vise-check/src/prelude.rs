@@ -17,16 +17,18 @@ pub const TYPES: &[&str] = &[
 /// Constructors of the built-in sum types, from §4 and §8.
 pub const CONSTRUCTORS: &[&str] = &["Ok", "Err", "Some", "None"];
 
-/// Free functions. `print` is used unimported by the §1 example.
-pub const FUNCTIONS: &[&str] = &["print"];
-
-/// Every name `core` puts in scope.
+/// Every name `core` puts in scope. Free functions come from
+/// [`crate::builtins`], the single enumeration every stage reads.
 pub fn all() -> impl Iterator<Item = (&'static str, Symbol)> {
     TYPES
         .iter()
         .map(|n| (*n, Symbol::Type))
         .chain(CONSTRUCTORS.iter().map(|n| (*n, Symbol::Constructor)))
-        .chain(FUNCTIONS.iter().map(|n| (*n, Symbol::Value)))
+        .chain(
+            crate::builtins::all()
+                .into_iter()
+                .map(|b| (b.name, Symbol::Value)),
+        )
 }
 
 /// What a name refers to.

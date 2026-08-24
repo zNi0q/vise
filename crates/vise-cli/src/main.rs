@@ -15,7 +15,7 @@ vise — a language whose author is a machine
 usage:
   vise check <file.vise> [--json]  parse, resolve, and type-check
   vise repl                        start an interactive session
-  vise run <file.vise>             check, then run `main`
+  vise run <file.vise> [args...]   check, then run `main`
   vise build <file.vise> [-o out]  check, then compile to a native binary
   vise fix <file.vise> [--dry-run] apply every unambiguous fix
   vise fmt <file.vise> [--check]   rewrite in canonical form
@@ -54,7 +54,7 @@ fn main() -> ExitCode {
         ["check", path] => run(path, Stage::Check, false),
         ["check", path, "--json"] | ["check", "--json", path] => run(path, Stage::Check, true),
         ["repl"] => repl::run(),
-        ["run", path] => run_file(path),
+        ["run", path, rest @ ..] => run_file(path, rest),
         ["build", path] => build_file(path, None),
         ["build", path, "-o", out] | ["build", "-o", out, path] => build_file(path, Some(out)),
         ["fmt", path] => fmt_file(path, false),
@@ -301,7 +301,7 @@ fn fmt_file(path: &str, check_only: bool) -> ExitCode {
 }
 
 /// Check, then execute `main`.
-fn run_file(path: &str) -> ExitCode {
+fn run_file(path: &str, argv: &[&str]) -> ExitCode {
     let text = match read(path) {
         Ok(t) => t,
         Err(code) => return code,
@@ -324,7 +324,8 @@ fn run_file(path: &str) -> ExitCode {
     let Some(module) = &parsed.module else {
         return ExitCode::FAILURE;
     };
-    let outcome = vise_interp::run(module);
+    let outcome =
+        vise_interp::run_with_args(module, argv.iter().map(|a| (*a).to_owned()).collect());
     // Print what ran before reporting how it ended.
     for line in &outcome.stdout {
         println!("{line}");
@@ -335,6 +336,11 @@ fn run_file(path: &str) -> ExitCode {
                 println!("=> {value}");
             }
             ExitCode::SUCCESS
+        }
+        // `exit` is how a program stops from the middle of itself, so it
+        // becomes a status code rather than a reported failure.
+        Err(vise_interp::Trap::Exit(code)) => {
+            ExitCode::from(u8::try_from(code.rem_euclid(256)).unwrap_or(1))
         }
         Err(trap) => {
             eprintln!("trap: {trap}");

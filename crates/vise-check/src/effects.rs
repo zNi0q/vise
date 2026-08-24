@@ -24,12 +24,6 @@ use vise_ast::{
 };
 use vise_diag::{Code, Confidence, Diagnostic, Fix, FixKind, Span};
 
-/// Effects performed by `core` functions.
-///
-/// Provisional, like the prelude itself: `print` writes to stdout, so §7 makes
-/// it `!{io}`.
-pub const BUILTIN_EFFECTS: &[(&str, Effect)] = &[("print", Effect::Io)];
-
 /// Where an effect entered a function.
 #[derive(Debug, Clone)]
 struct Origin {
@@ -195,11 +189,9 @@ fn interface(f: &FnDecl, inferred: &Origins) -> Vec<Effect> {
         .map_or_else(|| inferred.keys().copied().collect(), |r| r.effects.clone())
 }
 
+/// The effect a `core` function performs, from the one table all stages read.
 fn builtin_effect(name: &str) -> Option<Effect> {
-    BUILTIN_EFFECTS
-        .iter()
-        .find(|(n, _)| *n == name)
-        .map(|(_, e)| *e)
+    crate::builtins::find(name).and_then(|b| b.effect)
 }
 
 fn render_row(effects: &[Effect]) -> String {

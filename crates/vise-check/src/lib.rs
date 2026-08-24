@@ -1,6 +1,7 @@
 //! Semantic checks: name resolution, and later types, effects, and ownership.
 
 pub mod borrow;
+pub mod builtins;
 pub mod effects;
 pub mod exhaustive;
 pub mod infer;
@@ -11,6 +12,7 @@ pub mod scope;
 pub mod types;
 
 pub use borrow::check as check_borrows;
+pub use builtins::{Builtin, all as builtins, find as builtin};
 pub use effects::check as check_effects;
 pub use exhaustive::check as check_exhaustive;
 pub use infer::{TypeMap, check as check_types, check_with_types};

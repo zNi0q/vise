@@ -253,6 +253,98 @@ fn question_mark_propagates_err_immediately() {
     );
 }
 
+// --- core -----------------------------------------------------------------
+
+#[test]
+fn the_interpreter_implements_every_builtin() {
+    // The table in vise-check is the single enumeration of `core`. If an entry
+    // is added there and not here, this fails rather than the program trapping
+    // in front of whoever ran it.
+    for b in vise_check::builtins() {
+        let missing = matches!(
+            run(&module(&format!(
+                "module t\nfn main() {{ let _ = {}\n}}\n",
+                stub_call(&b)
+            )))
+            .result,
+            Err(Trap::Unsupported(ref m)) if m.contains("does not implement")
+        );
+        assert!(!missing, "`{}` is in core but not implemented", b.name);
+    }
+}
+
+/// A call to `b` with plausible arguments, used only to reach the dispatch.
+fn stub_call(b: &vise_check::Builtin) -> String {
+    let args: Vec<&str> = b
+        .params
+        .iter()
+        .map(|p| match format!("{p}").as_str() {
+            "Str" => "\"\"",
+            "Int" => "0",
+            "Bool" => "true",
+            _ => "[]",
+        })
+        .collect();
+    format!("{}({})", b.name, args.join(", "))
+}
+
+#[test]
+fn list_builtins_work() {
+    assert_eq!(eval("  length([1, 2, 3])"), Value::Int(3));
+    assert_eq!(
+        output("module t\nfn main() {\n  let xs = append([1], 2)\n  print(\"{length(xs)}\")\n}\n"),
+        ["2"]
+    );
+}
+
+#[test]
+fn string_builtins_work() {
+    assert_eq!(eval("  str_length(\"hello\")"), Value::Int(5));
+    assert_eq!(eval("  length(lines(\"a\\nb\\nc\"))"), Value::Int(3));
+    // A trailing newline ends the last line rather than starting an empty one.
+    assert_eq!(eval("  length(lines(\"a\\nb\\n\"))"), Value::Int(2));
+    assert_eq!(eval("  length(split(\"a,b,c\", \",\"))"), Value::Int(3));
+    assert_eq!(
+        output("module t\nfn main() {\n  print(join([\"a\", \"b\"], \"-\"))\n}\n"),
+        ["a-b"]
+    );
+    assert_eq!(
+        eval("  if starts_with(\"abc\", \"ab\") { 1 } else { 0 }"),
+        Value::Int(1)
+    );
+    assert_eq!(
+        eval("  if contains(\"abc\", \"bc\") { 1 } else { 0 }"),
+        Value::Int(1)
+    );
+}
+
+#[test]
+fn parse_int_reports_failure_as_a_value() {
+    // §8: no exceptions, so a parse that can fail returns an Option.
+    // The calls are bound first: a string literal cannot be nested inside an
+    // interpolation.
+    let src = concat!(
+        "module t\n",
+        "fn f(s: Str) -> Int {\n",
+        "  match parse_int(s) {\n    Some(n) -> n\n    None -> 0 - 1\n  }\n}\n",
+        "fn main() {\n",
+        "  let good = f(\"42\")\n",
+        "  let bad = f(\"nope\")\n",
+        "  print(\"{good} {bad}\")\n",
+        "}\n"
+    );
+    assert_eq!(output(src), ["42 -1"]);
+}
+
+#[test]
+fn exit_stops_the_program_with_a_status() {
+    let r = run(&module(
+        "module t\nfn main() {\n  print(\"before\")\n  exit(3)\n  print(\"after\")\n}\n",
+    ));
+    assert_eq!(r.stdout, ["before"]);
+    assert_eq!(r.result, Err(Trap::Exit(3)));
+}
+
 // --- methods ------------------------------------------------------------
 
 #[test]

@@ -1,0 +1,372 @@
+module growth
+
+-- growth: what grew, not what is big.
+--
+-- `du` answers the wrong question when a disk fills up. It tells you which
+-- directory is large, which is usually the same one it was last month. This
+-- records the sizes of a tree's immediate children, and later reports the
+-- difference, so the answer is the thing that changed.
+--
+--   growth snap <dir> [store]   record the current sizes as the baseline
+--   growth diff <dir> [store]   measure now, and report the change since
+--   growth show [store]         what the baseline holds
+--
+-- The store defaults to ./growth.snap and holds one baseline, in a plain
+-- line-oriented format anything can read.
+
+record Entry {
+  name: Str
+  bytes: Int
+}
+
+record Change {
+  name: Str
+  before: Int
+  after: Int
+}
+
+-- --- paths ----------------------------------------------------------------
+
+fn child(parent: Str, name: Str) -> Str {
+  join([parent, name], "/")
+}
+
+-- --- measuring ------------------------------------------------------------
+
+-- Total bytes under a path, following directories.
+--
+-- Anything unreadable counts as zero rather than stopping the walk: a tree
+-- with one permission-denied corner is still worth measuring.
+fn tree_bytes(path: Str) -> Int !{fs} {
+  if is_dir(path) {
+    match list_dir(path) {
+      Ok(names) -> sum_children(path, &names)
+      Err(problem) -> 0
+    }
+  } else {
+    match file_size(path) {
+      Ok(n) -> n
+      Err(problem) -> 0
+    }
+  }
+}
+
+fn sum_children(parent: Str, names: &List<Str>) -> Int !{fs} {
+  var total = 0
+  for name in names {
+    total = total + tree_bytes(child(parent, name))
+  }
+  total
+}
+
+-- One line per immediate child of `root`, with everything beneath it counted.
+fn measure(root: Str) -> List<Entry> !{fs} {
+  match list_dir(root) {
+    Ok(names) -> measure_each(root, &names)
+    Err(problem) -> []
+  }
+}
+
+fn measure_each(root: Str, names: &List<Str>) -> List<Entry> !{fs} {
+  var entries = []
+  for name in names {
+    let bytes = tree_bytes(child(root, name))
+    entries = append(entries, Entry { name: name, bytes: bytes })
+  }
+  entries
+}
+
+-- --- the store ------------------------------------------------------------
+
+fn render(taken: Int, root: Str, entries: &List<Entry>) -> Str {
+  var out = join(["snapshot", "{taken}", root], " ")
+  for e in entries {
+    out = join([out, join(["entry", "{e.bytes}", e.name], " ")], "\n")
+  }
+  out
+}
+
+fn parse_entries(text: Str) -> List<Entry> {
+  var entries = []
+  for line in lines(text) {
+    if starts_with(line, "entry ") {
+      let fields = split(line, " ")
+      entries = append(entries, entry_from(&fields))
+    } else {
+      Unit
+    }
+  }
+  entries
+}
+
+-- `entry <bytes> <name>`, where the name may itself contain spaces.
+fn entry_from(fields: &List<Str>) -> Entry {
+  let bytes = match at(fields, 1) {
+    Some(text) -> match parse_int(text) {
+      Some(n) -> n
+      None -> 0
+    }
+    None -> 0
+  }
+  Entry { name: rejoin(fields, 2), bytes: bytes }
+}
+
+fn rejoin(fields: &List<Str>, from: Int) -> Str {
+  var out = ""
+  var i = from
+  while i < length(fields) {
+    let piece = match at(fields, i) {
+      Some(text) -> text
+      None -> ""
+    }
+    if str_length(out) == 0 {
+      out = piece
+    } else {
+      out = join([out, piece], " ")
+    }
+    i = i + 1
+  }
+  out
+}
+
+fn taken_at(text: Str) -> Int {
+  var when = 0
+  for line in lines(text) {
+    if starts_with(line, "snapshot ") {
+      let fields = split(line, " ")
+      when = match at(fields, 1) {
+        Some(t) -> match parse_int(t) {
+          Some(n) -> n
+          None -> 0
+        }
+        None -> 0
+      }
+    } else {
+      Unit
+    }
+  }
+  when
+}
+
+-- --- comparing -----------------------------------------------------------
+
+fn find(entries: &List<Entry>, name: Str) -> Option<Entry> {
+  var found = None
+  for e in entries {
+    if e.name == name {
+      found = Some(e)
+    } else {
+      Unit
+    }
+  }
+  found
+}
+
+fn changes(before: &List<Entry>, after: &List<Entry>) -> List<Change> {
+  var out = []
+  -- Everything that exists now, whether or not it did before.
+  for a in after {
+    let was = match find(&before, a.name) {
+      Some(e) -> e.bytes
+      None -> 0
+    }
+    if was == a.bytes {
+      Unit
+    } else {
+      out = append(out, Change { name: a.name, before: was, after: a.bytes })
+    }
+  }
+  -- And everything that has since disappeared. The match is used as an
+  -- expression producing the new list: an arm is an expression, so a bare
+  -- assignment cannot be one.
+  for b in before {
+    out = match find(&after, b.name) {
+      Some(e) -> out
+      None -> append(out, Change { name: b.name, before: b.bytes, after: 0 })
+    }
+  }
+  out
+}
+
+fn delta(c: &Change) -> Int {
+  c.after - c.before
+}
+
+fn magnitude(n: Int) -> Int {
+  if n < 0 { 0 - n } else { n }
+}
+
+-- Largest movement first, in either direction: a directory that shrank by a
+-- gigabyte is as interesting as one that grew by a gigabyte.
+fn sort_by_movement(items: List<Change>) -> List<Change> {
+  var remaining = items
+  var out = []
+  while length(remaining) > 0 {
+    let best = biggest(&remaining)
+    out = append(out, best)
+    remaining = without(&remaining, best.name)
+  }
+  out
+}
+
+fn biggest(items: &List<Change>) -> Change {
+  var best = Change { name: "", before: 0, after: 0 }
+  var seen = false
+  for c in items {
+    if seen {
+      if magnitude(delta(&c)) > magnitude(delta(&best)) {
+        best = c
+      } else {
+        Unit
+      }
+    } else {
+      best = c
+      seen = true
+    }
+  }
+  best
+}
+
+fn without(items: &List<Change>, name: Str) -> List<Change> {
+  var out = []
+  var dropped = false
+  for c in items {
+    if c.name == name && !dropped {
+      dropped = true
+    } else {
+      out = append(out, c)
+    }
+  }
+  out
+}
+
+-- --- formatting ----------------------------------------------------------
+
+-- Three significant figures is enough to act on, and integer division keeps
+-- the output identical on every machine (§11).
+fn human(bytes: Int) -> Str {
+  let n = magnitude(bytes)
+  if n < 1024 {
+    "{n}B"
+  } else {
+    if n < 1048576 {
+      scaled(n, 1024, "K")
+    } else {
+      if n < 1073741824 {
+        scaled(n, 1048576, "M")
+      } else {
+        scaled(n, 1073741824, "G")
+      }
+    }
+  }
+}
+
+fn scaled(n: Int, unit: Int, suffix: Str) -> Str {
+  let whole = n / unit
+  let tenths = (n * 10 / unit) % 10
+  if whole >= 100 {
+    "{whole}{suffix}"
+  } else {
+    "{whole}.{tenths}{suffix}"
+  }
+}
+
+fn signed(bytes: Int) -> Str {
+  if bytes < 0 {
+    "-{human(bytes)}"
+  } else {
+    "+{human(bytes)}"
+  }
+}
+
+-- --- commands ------------------------------------------------------------
+
+fn store_path(rest: &List<Str>, index: Int) -> Str {
+  match at(rest, index) {
+    Some(path) -> path
+    None -> "growth.snap"
+  }
+}
+
+fn do_snap(root: Str, store: Str) !{fs, io, time} {
+  let entries = measure(root)
+  match write_file(store, render(now(), root, &entries)) {
+    Ok(nothing) -> print("recorded {length(entries)} entries of {root} in {store}")
+    Err(problem) -> print("cannot write {store}: {problem}")
+  }
+}
+
+fn do_diff(root: Str, store: Str) !{fs, io} {
+  match read_file(store) {
+    Ok(text) -> report(root, text)
+    Err(problem) -> print("no baseline in {store}: run `growth snap {root}` first")
+  }
+}
+
+fn report(root: Str, text: Str) !{fs, io} {
+  let before = parse_entries(text)
+  let after = measure(root)
+  let moved = sort_by_movement(changes(&before, &after))
+
+  if length(moved) == 0 {
+    print("nothing changed under {root}")
+  } else {
+    print("since the last snapshot of {root}:")
+    var total = 0
+    for c in moved {
+      total = total + delta(&c)
+      print("  {signed(delta(&c))}\t{c.name}")
+    }
+    print("  ------")
+    print("  {signed(total)}\ttotal")
+  }
+}
+
+fn do_show(store: Str) !{fs, io} {
+  match read_file(store) {
+    Ok(text) -> {
+      let entries = parse_entries(text)
+      print("baseline: {length(entries)} entries, taken at {taken_at(text)}")
+      for e in entries {
+        print("  {human(e.bytes)}\t{e.name}")
+      }
+    }
+    Err(problem) -> print("no baseline in {store}")
+  }
+}
+
+fn usage() !{io} {
+  print("growth: what grew, not what is big")
+  print("")
+  print("  growth snap <dir> [store]   record the current sizes")
+  print("  growth diff <dir> [store]   report the change since")
+  print("  growth show [store]         show the baseline")
+}
+
+fn main() !{fs, io, time, env} {
+  let argv = args()
+  match at(argv, 0) {
+    None -> usage()
+    Some(command) -> dispatch(command, &argv)
+  }
+}
+
+fn dispatch(command: Str, argv: &List<Str>) !{fs, io, time} {
+  let target = match at(argv, 1) {
+    Some(path) -> path
+    None -> "."
+  }
+  if command == "snap" {
+    do_snap(target, store_path(argv, 2))
+  } else {
+    if command == "diff" {
+      do_diff(target, store_path(argv, 2))
+    } else {
+      if command == "show" {
+        do_show(store_path(argv, 1))
+      } else {
+        usage()
+      }
+    }
+  }
+}

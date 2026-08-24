@@ -86,15 +86,27 @@ fn finish(outcome: Eval<Value>) -> Result<Value, Trap> {
     }
 }
 
-/// Run `main`.
+/// Run `main` with no command-line arguments.
 #[must_use]
 pub fn run(module: &Module) -> Run {
-    call(module, "main", Vec::new())
+    run_with_args(module, Vec::new())
+}
+
+/// Run `main`, giving it the arguments `args()` should report.
+#[must_use]
+pub fn run_with_args(module: &Module, args: Vec<String>) -> Run {
+    call_with(module, "main", Vec::new(), args)
 }
 
 /// Call one function by name.
 #[must_use]
 pub fn call(module: &Module, name: &str, args: Vec<Value>) -> Run {
+    call_with(module, name, args, Vec::new())
+}
+
+/// Call one function by name, with command-line arguments for `args()`.
+#[must_use]
+pub fn call_with(module: &Module, name: &str, args: Vec<Value>, argv: Vec<String>) -> Run {
     // A tree-walking evaluator uses many native frames per Vise call, so deep
     // recursion would abort the process before `MAX_DEPTH` was reached. A
     // benchmark harness cannot tell an aborted process apart from a bug in
@@ -103,7 +115,7 @@ pub fn call(module: &Module, name: &str, args: Vec<Value>) -> Run {
     std::thread::scope(|scope| {
         std::thread::Builder::new()
             .stack_size(64 * 1024 * 1024)
-            .spawn_scoped(scope, || call_on_this_thread(module, name, args))
+            .spawn_scoped(scope, || call_on_this_thread(module, name, args, argv))
             .expect("spawning the interpreter thread")
             .join()
             .unwrap_or_else(|_| Run {
@@ -113,7 +125,7 @@ pub fn call(module: &Module, name: &str, args: Vec<Value>) -> Run {
     })
 }
 
-fn call_on_this_thread(module: &Module, name: &str, args: Vec<Value>) -> Run {
+fn call_on_this_thread(module: &Module, name: &str, args: Vec<Value>, argv: Vec<String>) -> Run {
     let mut fns = BTreeMap::new();
     let mut ctors = BTreeMap::new();
     for item in &module.items {
@@ -136,6 +148,7 @@ fn call_on_this_thread(module: &Module, name: &str, args: Vec<Value>) -> Run {
     let mut interp = Interp {
         fns,
         ctors,
+        argv,
         stdout: Vec::new(),
         scopes: Vec::new(),
         depth: 0,
@@ -154,6 +167,7 @@ const MAX_DEPTH: usize = 512;
 struct Interp {
     fns: BTreeMap<String, FnDecl>,
     ctors: BTreeMap<String, usize>,
+    argv: Vec<String>,
     stdout: Vec<String>,
     scopes: Vec<BTreeMap<String, Value>>,
     depth: usize,
@@ -193,10 +207,8 @@ impl Interp {
     // --- calls -----------------------------------------------------------
 
     fn call(&mut self, name: &str, args: Vec<Value>) -> Result<Value, Trap> {
-        if name == "print" {
-            let line = args.first().map(ToString::to_string).unwrap_or_default();
-            self.stdout.push(line);
-            return Ok(Value::Unit);
+        if vise_check::builtin(name).is_some() {
+            return self.builtin(name, args);
         }
         if let Some(arity) = self.ctors.get(name).copied() {
             if args.len() == arity {
@@ -230,6 +242,138 @@ impl Interp {
         self.scopes = saved;
         self.depth -= 1;
         outcome
+    }
+
+    /// Every `core` function.
+    ///
+    /// The set comes from `vise_check::builtins`, and a test asserts this
+    /// implements all of it, so the table and the runtime cannot drift.
+    #[allow(clippy::too_many_lines)]
+    fn builtin(&mut self, name: &str, args: Vec<Value>) -> Result<Value, Trap> {
+        let str_at = |i: usize| -> String {
+            match args.get(i) {
+                Some(Value::Str(s)) => s.to_string(),
+                Some(other) => other.to_string(),
+                None => String::new(),
+            }
+        };
+        let int_at = |i: usize| -> i64 {
+            match args.get(i) {
+                Some(Value::Int(n)) => *n,
+                _ => 0,
+            }
+        };
+        let ok = |v: Value| Value::variant("Ok", vec![v]);
+        let err = |m: String| Value::variant("Err", vec![Value::str(m)]);
+        let some = |v: Value| Value::variant("Some", vec![v]);
+        let none = || Value::variant("None", Vec::new());
+
+        Ok(match name {
+            "print" => {
+                self.stdout.push(str_at(0));
+                Value::Unit
+            }
+
+            "length" => match args.first() {
+                Some(Value::List(items)) => {
+                    Value::Int(i64::try_from(items.len()).unwrap_or(i64::MAX))
+                }
+                _ => Value::Int(0),
+            },
+            "append" => match (args.first(), args.get(1)) {
+                (Some(Value::List(items)), Some(v)) => {
+                    let mut next = items.as_ref().clone();
+                    next.push(v.clone());
+                    Value::List(Arc::new(next))
+                }
+                _ => Value::List(Arc::new(Vec::new())),
+            },
+            "at" => match (args.first(), args.get(1)) {
+                (Some(Value::List(items)), Some(Value::Int(i))) => usize::try_from(*i)
+                    .ok()
+                    .and_then(|u| items.get(u).cloned())
+                    .map_or_else(none, some),
+                _ => none(),
+            },
+
+            "str_length" => {
+                Value::Int(i64::try_from(str_at(0).chars().count()).unwrap_or(i64::MAX))
+            }
+            "lines" => {
+                let text = str_at(0);
+                // A trailing newline ends the last line; it does not begin an
+                // empty one. `lines` on "a\n" is one line, not two.
+                let items: Vec<Value> = text.lines().map(Value::str).collect();
+                Value::List(Arc::new(items))
+            }
+            "split" => {
+                let text = str_at(0);
+                let sep = str_at(1);
+                let items: Vec<Value> = if sep.is_empty() {
+                    text.chars().map(|c| Value::str(c.to_string())).collect()
+                } else {
+                    text.split(sep.as_str()).map(Value::str).collect()
+                };
+                Value::List(Arc::new(items))
+            }
+            "join" => match args.first() {
+                Some(Value::List(items)) => {
+                    let parts: Vec<String> = items.iter().map(ToString::to_string).collect();
+                    Value::str(parts.join(&str_at(1)))
+                }
+                _ => Value::str(""),
+            },
+            "starts_with" => Value::Bool(str_at(0).starts_with(&str_at(1))),
+            "contains" => Value::Bool(str_at(0).contains(&str_at(1))),
+            "parse_int" => str_at(0)
+                .trim()
+                .parse::<i64>()
+                .map_or_else(|_| none(), |n| some(Value::Int(n))),
+
+            "read_file" => match std::fs::read_to_string(str_at(0)) {
+                Ok(text) => ok(Value::str(text)),
+                Err(e) => err(e.to_string()),
+            },
+            "write_file" => match std::fs::write(str_at(0), str_at(1)) {
+                Ok(()) => ok(Value::Unit),
+                Err(e) => err(e.to_string()),
+            },
+            "list_dir" => match std::fs::read_dir(str_at(0)) {
+                Ok(entries) => {
+                    let mut names: Vec<String> = entries
+                        .filter_map(|e| Some(e.ok()?.file_name().to_string_lossy().into_owned()))
+                        .collect();
+                    // Sorted, because §11 says a program's output must not
+                    // depend on the order a filesystem happens to report.
+                    names.sort();
+                    ok(Value::List(Arc::new(
+                        names.into_iter().map(Value::str).collect(),
+                    )))
+                }
+                Err(e) => err(e.to_string()),
+            },
+            "is_dir" => Value::Bool(std::path::Path::new(&str_at(0)).is_dir()),
+            "file_size" => match std::fs::metadata(str_at(0)) {
+                Ok(m) => ok(Value::Int(i64::try_from(m.len()).unwrap_or(i64::MAX))),
+                Err(e) => err(e.to_string()),
+            },
+
+            "args" => Value::List(Arc::new(
+                self.argv.iter().map(Value::str).collect::<Vec<_>>(),
+            )),
+            "now" => Value::Int(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX)),
+            ),
+            "exit" => return Err(Trap::Exit(int_at(0))),
+
+            other => {
+                return Err(Trap::Unsupported(format!(
+                    "`{other}` is in core but the interpreter does not implement it"
+                )));
+            }
+        })
     }
 
     /// Run a function body with its contracts.

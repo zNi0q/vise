@@ -8,6 +8,7 @@ rust-version.workspace = true
 
 [dependencies]
 vise-ast.workspace = true
+vise-check.workspace = true
 
 [dev-dependencies]
 vise-parse.workspace = true

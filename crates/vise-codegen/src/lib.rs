@@ -563,10 +563,9 @@ impl Emitter<'_> {
                 self.line("continue;");
                 "0".to_owned()
             }
-            ExprKind::Borrow { .. } => {
-                self.refuse(e.span, "a borrow");
-                "0".to_owned()
-            }
+            // A borrow is transparent: values are immutable, so the borrow and
+            // its referent lower to the same thing.
+            ExprKind::Borrow { operand, .. } => self.expr(operand),
             ExprKind::MethodCall {
                 receiver,
                 method,
@@ -747,7 +746,16 @@ impl Emitter<'_> {
         }
 
         if !self.functions.contains_key(&name.name) {
-            self.refuse(whole.span, "a call to an imported function");
+            // A `core` function the backend has no C for is a different problem
+            // from an import with no definition, and says so.
+            if vise_check::builtin(&name.name).is_some() {
+                self.refuse(
+                    whole.span,
+                    &format!("`{}`, a core function with no C implementation", name.name),
+                );
+            } else {
+                self.refuse(whole.span, "a call to an imported function");
+            }
             return "0".to_owned();
         }
         format!("vise_fn_{}({})", mangle(&name.name), values.join(", "))
