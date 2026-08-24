@@ -82,7 +82,8 @@ wrong and the repo should say so.
 - [ ] Syscall trampoline (asm)
 - [~] x86-64 context switch (asm) and cooperative fibers done; the scheduler
       that drives them is not written yet
-- [ ] Trace record / replay (`vise run --record`, `vise replay`)
+- [~] Trace record / replay runtime done (`runtime/c/trace.c`); the CLI flags
+      that drive it are not wired up yet
 - [ ] Deterministic softfloat for transcendentals
 - [ ] Proof that static effect rows and runtime confinement agree
 

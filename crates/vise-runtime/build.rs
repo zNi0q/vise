@@ -4,30 +4,40 @@
 //! workspace's no-third-party-dependency policy holds for the build as well as
 //! for the code.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
+/// Every C translation unit in the runtime library.
+const SOURCES: &[&str] = &["capability.c", "fiber.c", "trace.c"];
+
+/// C test programs, and the library sources each needs. They are built here and
+/// run from a Rust test: the cases fork, install irreversible filters, and
+/// switch stacks, all of which are far more natural in C than through an FFI
+/// shim.
+const TEST_PROGRAMS: &[(&str, &[&str])] = &[
+    ("test_capability", &["capability.c"]),
+    ("test_fiber", &["fiber.c"]),
+    ("test_trace", &["trace.c"]),
+];
+
+/// Warnings are errors: this code is small enough that every one is real.
+const CFLAGS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
+
 fn main() {
-    let runtime = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../runtime/c");
-    let asm = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../runtime/asm");
-    for file in [
-        "capability.c",
-        "capability.h",
-        "test_capability.c",
-        "fiber.c",
-        "fiber.h",
-        "test_fiber.c",
-    ] {
-        println!("cargo:rerun-if-changed={}", runtime.join(file).display());
-    }
-    println!(
-        "cargo:rerun-if-changed={}",
-        asm.join("switch_x86_64.S").display()
-    );
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let runtime = root.join("../../runtime/c");
+    let asm = root.join("../../runtime/asm");
+
     println!("cargo:rerun-if-changed=build.rs");
-    // Declare the cfg this script may set, so an unexpected-cfg warning cannot
-    // hide a typo in it.
     println!("cargo:rustc-check-cfg=cfg(vise_no_runtime)");
+    for dir in [&runtime, &asm] {
+        for entry in std::fs::read_dir(dir).expect("the runtime directories should exist") {
+            println!(
+                "cargo:rerun-if-changed={}",
+                entry.expect("a readable entry").path().display()
+            );
+        }
+    }
 
     // The gate is Linux-only; elsewhere the Rust side reports it unsupported.
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("linux") {
@@ -45,13 +55,12 @@ fn main() {
     let has_asm = std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64");
     let mut objects = Vec::new();
 
-    for source in ["capability.c", "fiber.c"] {
+    for source in SOURCES {
         let object = out.join(format!("{source}.o"));
         run(
             Command::new(&cc)
-                .args([
-                    "-std=c11", "-O2", "-fPIC", "-Wall", "-Wextra", "-Werror", "-c",
-                ])
+                .args(CFLAGS)
+                .args(["-fPIC", "-c"])
                 .arg(runtime.join(source))
                 .arg("-I")
                 .arg(&runtime)
@@ -82,44 +91,31 @@ fn main() {
         "archiving libvise_runtime.a",
     );
 
-    // The C test binary is built here too, so a Rust test can run it. Seccomp
-    // filters are irreversible, so the cases have to fork, which is far more
-    // natural in C than through a Rust FFI shim.
-    let caps_test = out.join("test_capability");
-    run(
-        Command::new(&cc)
-            .args(["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"])
-            .arg(runtime.join("capability.c"))
-            .arg(runtime.join("test_capability.c"))
-            .arg("-I")
-            .arg(&runtime)
-            .arg("-o")
-            .arg(&caps_test),
-        "building test_capability",
-    );
-
-    let fiber_test = out.join("test_fiber");
-    let mut build_fibers = Command::new(&cc);
-    build_fibers
-        .args(["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"])
-        .arg(runtime.join("fiber.c"))
-        .arg(runtime.join("test_fiber.c"));
-    if has_asm {
-        build_fibers.arg(asm.join("switch_x86_64.S"));
+    for (name, sources) in TEST_PROGRAMS {
+        let binary = out.join(name);
+        let mut build = Command::new(&cc);
+        build.args(CFLAGS);
+        for source in *sources {
+            build.arg(runtime.join(source));
+        }
+        build.arg(runtime.join(format!("{name}.c")));
+        if *name == "test_fiber" && has_asm {
+            build.arg(asm.join("switch_x86_64.S"));
+        }
+        run(
+            build.arg("-I").arg(&runtime).arg("-o").arg(&binary),
+            &format!("building {name}"),
+        );
+        // Rust tests find each program through its own environment variable.
+        println!(
+            "cargo:rustc-env=VISE_{}={}",
+            name.to_uppercase(),
+            binary.display()
+        );
     }
-    run(
-        build_fibers
-            .arg("-I")
-            .arg(&runtime)
-            .arg("-o")
-            .arg(&fiber_test),
-        "building test_fiber",
-    );
 
     println!("cargo:rustc-link-search=native={}", out.display());
     println!("cargo:rustc-link-lib=static=vise_runtime");
-    println!("cargo:rustc-env=VISE_CAPTEST={}", caps_test.display());
-    println!("cargo:rustc-env=VISE_FIBERTEST={}", fiber_test.display());
 }
 
 fn run(command: &mut Command, what: &str) {
@@ -127,5 +123,4 @@ fn run(command: &mut Command, what: &str) {
         .status()
         .unwrap_or_else(|e| panic!("{what}: could not start: {e}"));
     assert!(status.success(), "{what}: exited with {status}");
-    let _: &Path = Path::new("");
 }

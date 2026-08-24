@@ -60,14 +60,18 @@ fn env_grants_no_syscall() {
 #[test]
 #[cfg(target_os = "linux")]
 fn the_gate_actually_confines() {
-    let binary = env!("VISE_CAPTEST");
+    run_c_suite(env!("VISE_TEST_CAPABILITY"), "capability gate");
+}
+
+/// Run one of the C suites built alongside this crate.
+#[cfg(target_os = "linux")]
+fn run_c_suite(binary: &str, what: &str) {
     let output = std::process::Command::new(binary)
         .output()
         .unwrap_or_else(|e| panic!("could not run {binary}: {e}"));
-
     assert!(
         output.status.success(),
-        "capability gate cases failed:\n{}{}",
+        "{what} cases failed:\n{}{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -82,16 +86,15 @@ fn fibers_switch_deterministically() {
         vise_runtime::fibers_supported(),
         "x86-64 should have a context switch"
     );
-    let binary = env!("VISE_FIBERTEST");
-    let output = std::process::Command::new(binary)
-        .output()
-        .unwrap_or_else(|e| panic!("could not run {binary}: {e}"));
-    assert!(
-        output.status.success(),
-        "fiber cases failed:\n{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+    run_c_suite(env!("VISE_TEST_FIBER"), "fiber");
+}
+
+/// Runs the C trace suite: values come back in order, and a program that asks
+/// for something else is stopped rather than quietly resynchronised.
+#[test]
+#[cfg(target_os = "linux")]
+fn traces_record_and_replay() {
+    run_c_suite(env!("VISE_TEST_TRACE"), "trace");
 }
 
 /// `confine` is deliberately not called in-process anywhere else: it cannot be
