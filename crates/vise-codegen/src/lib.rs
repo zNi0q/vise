@@ -814,10 +814,7 @@ impl Emitter<'_> {
             let built = self.temp();
             self.line(format!("vise_enum {built};"));
             self.line(format!("memset(&{built}, 0, sizeof {built});"));
-            self.line(format!(
-                "{built}.tag = VISE_TAG_{owner}_{};",
-                name.name
-            ));
+            self.line(format!("{built}.tag = VISE_TAG_{owner}_{};", name.name));
             let subject = self.type_of(whole);
             for (i, (value, arg)) in values.iter().zip(args).enumerate() {
                 let declared = self.payload_type(&name.name, i, &subject);

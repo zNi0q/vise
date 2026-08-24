@@ -8,8 +8,8 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use vise_check::check_with_types;
 use vise_check::Ty;
+use vise_check::check_with_types;
 use vise_codegen::emit;
 use vise_diag::FileId;
 use vise_parse::parse;
