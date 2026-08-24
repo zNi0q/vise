@@ -1,0 +1,32 @@
+module result
+
+-- The size to run at, taken from the command line so nothing can be folded away
+-- at compile time. A benchmark whose answer is a constant measures the
+-- optimiser, not the language.
+fn size(fallback: Int) -> Int !{env} {
+    match at(args(), 0) {
+        Some(text) -> match parse_int(text) {
+            Some(n) -> n
+            None -> fallback
+        }
+        None -> fallback
+    }
+}
+
+fn half(n: Int) -> Result<Int, Str> {
+    if n % 2 == 0 { Ok(n / 2) } else { Err("odd") }
+}
+
+fn main() !{env, io} {
+    let n = size(50000000)
+    var sum = 0
+    var i = 0
+    while i < n {
+        sum = sum + match half(i) {
+            Ok(v) -> v
+            Err(_) -> 0
+        }
+        i = i + 1
+    }
+    print("{sum}")
+}

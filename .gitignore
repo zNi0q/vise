@@ -8,3 +8,4 @@ runtime/**/*.a
 
 # traces produced by `vise run --record`
 *.trace
+bench/speed/build/

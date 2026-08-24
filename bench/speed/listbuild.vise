@@ -1,0 +1,34 @@
+module listbuild
+
+-- The size to run at, taken from the command line so nothing can be folded away
+-- at compile time. A benchmark whose answer is a constant measures the
+-- optimiser, not the language.
+fn size(fallback: Int) -> Int !{env} {
+    match at(args(), 0) {
+        Some(text) -> match parse_int(text) {
+            Some(n) -> n
+            None -> fallback
+        }
+        None -> fallback
+    }
+}
+
+fn main() !{env, io} {
+    let n = size(20000000)
+    var xs: List<Int> = []
+    var i = 0
+    while i < n {
+        xs = append(xs, i)
+        i = i + 1
+    }
+    var sum = 0
+    var j = 0
+    while j < length(xs) {
+        sum = sum + match at(xs, j) {
+            Some(v) -> v
+            None -> 0
+        }
+        j = j + 1
+    }
+    print("{sum}")
+}
