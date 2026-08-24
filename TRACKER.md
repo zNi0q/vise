@@ -76,12 +76,12 @@ wrong and the repo should say so.
 
 ## M5 — Runtime (C + Assembly)
 
-- [ ] Allocator
+- [!] Allocator — deferred, see decisions
 - [x] Capability gate: seccomp-bpf filter derived from the effect row
       (`runtime/c/capability.c`), with a C suite that forks per case
-- [ ] Syscall trampoline (asm)
-- [~] x86-64 context switch (asm) and cooperative fibers done; the scheduler
-      that drives them is not written yet
+- [x] ~~Syscall trampoline (asm)~~ — retired, see decisions
+- [x] x86-64 context switch (asm) and cooperative fibers
+- [!] Scheduler — deferred, see decisions
 - [~] Trace record / replay runtime done (`runtime/c/trace.c`); the CLI flags
       that drive it are not wired up yet
 - [x] Deterministic softfloat for transcendentals (`runtime/c/softfloat.c`)
@@ -112,6 +112,10 @@ wrong and the repo should say so.
 | 2026-08-22 | Record literals are banned in `if`/`while`/`for`/`match` headers | `if x { .. }` cannot otherwise be told from a record literal; parentheses re-enable them (Rust's rule) |
 | 2026-08-22 | Comparisons are non-associative | `a < b < c` would quietly compare a Bool with a number |
 | 2026-08-22 | Paths are a single segment; `::` is not parsed | The spec's examples use bare constructors (`Ok`, `CardDeclined`). See spec issue 4. |
+| 2026-08-24 | No syscall trampoline | The plan assumed a userspace hook. seccomp-bpf enforces in the kernel, so a trampoline would intercept nothing. Writing one would be decoration, which the first decision in this table rules out. |
+| 2026-08-24 | No allocator yet | The stated reason was determinism, but an address is not observable from Vise: there is no pointer printing and no address comparison, and destruction order is set by scope rather than by the allocator. It becomes worth writing when the arena for graph data does (M4). |
+| 2026-08-24 | No scheduler yet | Fibers are the substrate, but §13 rules out shared-memory threading and the language has no concurrency construct, so there is nothing to schedule. Building one now would be speculative. |
+| 2026-08-24 | No separate IR; the backend emits C from the checked AST | An IR earns its place with several backends or optimisation passes. With one backend it is indirection, and it can be introduced later without changing the front end. |
 | 2026-08-23 | A numeric literal adopts the other operand's type | Resolves a contradiction between §4 (distinct types) and §10 (whose `fee` example did arithmetic between `Cents` and integer literals). Narrowest rule that works: named types still never mix. |
 
 ## Open spec issues
