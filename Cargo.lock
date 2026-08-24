@@ -26,6 +26,7 @@ dependencies = [
  "vise-check",
  "vise-codegen",
  "vise-diag",
+ "vise-fmt",
  "vise-interp",
  "vise-ir",
  "vise-lex",
@@ -42,6 +43,15 @@ dependencies = [
 [[package]]
 name = "vise-diag"
 version = "0.1.0"
+
+[[package]]
+name = "vise-fmt"
+version = "0.1.0"
+dependencies = [
+ "vise-ast",
+ "vise-diag",
+ "vise-parse",
+]
 
 [[package]]
 name = "vise-interp"

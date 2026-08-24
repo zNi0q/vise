@@ -1,6 +1,7 @@
 module swapped
 
 type UserId = Int
+
 type Cents = Int
 
 record Receipt {

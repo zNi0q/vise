@@ -29,7 +29,8 @@ Work proceeds one task at a time, one commit per task. Commit messages follow
 - [x] Parser error recovery producing multiple diagnostics per run
 - [x] Diagnostic type with stable codes, spans, in-scope names, ranked fixes
 - [x] JSON diagnostic emitter (`V0101`, `V0201`, …)
-- [ ] Canonical formatter (`vise fmt`), non-configurable
+- [x] Canonical formatter (`vise fmt`), non-configurable; idempotent and
+      round-trip tested
 
 ## M2 — Types and effects
 

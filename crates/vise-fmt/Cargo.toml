@@ -1,0 +1,17 @@
+[package]
+name = "vise-fmt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+vise-ast.workspace = true
+
+[dev-dependencies]
+vise-diag.workspace = true
+vise-parse.workspace = true
+
+[lints]
+workspace = true

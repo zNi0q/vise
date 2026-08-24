@@ -18,6 +18,7 @@ vise-parse.workspace = true
 vise-check.workspace = true
 vise-ir.workspace = true
 vise-codegen.workspace = true
+vise-fmt.workspace = true
 vise-interp.workspace = true
 
 [lints]

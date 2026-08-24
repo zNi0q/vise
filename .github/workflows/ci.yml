@@ -42,3 +42,9 @@ jobs:
           ./target/debug/vise check examples/greet.vise
           ./target/debug/vise check examples/payments.vise
           ./target/debug/vise run examples/greet.vise
+          # The examples must be canonical: the formatter is dogfooded here.
+          for f in examples/*.vise; do
+            if ./target/debug/vise parse "$f" >/dev/null 2>&1; then
+              ./target/debug/vise fmt "$f" --check
+            fi
+          done

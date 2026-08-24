@@ -3,6 +3,7 @@ module payments
 use std/http@1:{post}
 
 type UserId = Int
+
 type Cents = Int
 
 record Receipt {

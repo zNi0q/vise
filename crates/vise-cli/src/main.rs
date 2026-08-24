@@ -14,6 +14,7 @@ usage:
   vise check <file.vise> [--json]  parse, resolve, and type-check
   vise run <file.vise>             check, then run `main`
   vise fix <file.vise> [--dry-run] apply every unambiguous fix
+  vise fmt <file.vise> [--check]   rewrite in canonical form
   vise parse <file.vise> [--json]  parse only
   vise lex <file.vise> [--json]    tokenise only
   vise explain <CODE>              explain a diagnostic code, e.g. V0401
@@ -49,6 +50,8 @@ fn main() -> ExitCode {
         ["check", path] => run(path, Stage::Check, false),
         ["check", path, "--json"] | ["check", "--json", path] => run(path, Stage::Check, true),
         ["run", path] => run_file(path),
+        ["fmt", path] => fmt_file(path, false),
+        ["fmt", path, "--check"] | ["fmt", "--check", path] => fmt_file(path, true),
         ["fix", path] => fix_file(path, false),
         ["fix", path, "--dry-run"] | ["fix", "--dry-run", path] => fix_file(path, true),
         _ => {
@@ -163,6 +166,45 @@ fn run(path: &str, stage: Stage, as_json: bool) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+/// Rewrite a file in canonical form, or report that it is not.
+fn fmt_file(path: &str, check_only: bool) -> ExitCode {
+    let text = match read(path) {
+        Ok(t) => t,
+        Err(code) => return code,
+    };
+
+    let mut map = SourceMap::new();
+    let file = map.add(path, text.clone());
+    let parsed = vise_parse::parse(&text, file);
+
+    // Formatting reprints the tree, so a file that does not parse cannot be
+    // formatted without losing what the author wrote.
+    if parsed.has_errors() || parsed.module.is_none() {
+        print!("{}", render::report(&parsed.diagnostics, &map));
+        eprintln!("not formatting: the file does not parse");
+        return ExitCode::FAILURE;
+    }
+    let module = parsed.module.expect("checked above");
+    let formatted = vise_fmt::format(&module);
+
+    if formatted == text {
+        if !check_only {
+            println!("{path} is already canonical");
+        }
+        return ExitCode::SUCCESS;
+    }
+    if check_only {
+        eprintln!("{path} is not canonical");
+        return ExitCode::FAILURE;
+    }
+    if let Err(e) = std::fs::write(path, &formatted) {
+        eprintln!("cannot write {path}: {e}");
+        return ExitCode::from(2);
+    }
+    println!("formatted {path}");
+    ExitCode::SUCCESS
 }
 
 /// Check, then execute `main`.
