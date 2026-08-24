@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use vise_check::check_with_types;
+use vise_check::Ty;
 use vise_codegen::emit;
 use vise_diag::FileId;
 use vise_parse::parse;
@@ -275,12 +276,6 @@ fn unsupported_constructs_are_named_not_miscompiled() {
             "module t\nuse std/http@1:{post}\nfn main() {\n  let r = post(\"/x\")\n}\n",
             "imported function",
         ),
-        // A core function with no C implementation is refused by name, and
-        // distinctly from an import, which has no definition at all.
-        (
-            "module t\nfn main() {\n  let r = read_file(\"x\")\n}\n",
-            "read_file",
-        ),
     ] {
         let m = module(src);
         let (_, types) = check_with_types(&m);
@@ -300,6 +295,85 @@ fn unsupported_constructs_are_named_not_miscompiled() {
                 .iter()
                 .map(|d| d.message.as_str())
                 .collect::<Vec<_>>()
+        );
+    }
+}
+
+/// `core` functions that return a wide payload agree.
+///
+/// This is the case the rest of the suite missed. A `Result<List<Str>, Str>`
+/// crosses from the C runtime into generated code, and the two have to agree on
+/// where the list is: the runtime once boxed it and the backend once read it
+/// inline, so `list_dir` returned an empty list in compiled code and the right
+/// one when interpreted. Nothing here exercised that until `growth` did.
+#[test]
+fn core_functions_returning_wide_payloads_agree() {
+    let dir = std::env::temp_dir().join(format!("vise-wide-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("a directory to look at");
+    std::fs::write(dir.join("beta.txt"), "one\ntwo\n").expect("a file to read");
+    std::fs::write(dir.join("alpha.txt"), "x").expect("a second file");
+    let at = dir.display().to_string();
+
+    let src = format!(
+        "module t\n\
+         fn main() !{{fs, io}} {{\n\
+        \x20 match list_dir(\"{at}\") {{\n\
+        \x20   Ok(names) -> print(join(names, \",\"))\n\
+        \x20   Err(e) -> print(\"error {{e}}\")\n\
+        \x20 }}\n\
+        \x20 match read_file(\"{at}/beta.txt\") {{\n\
+        \x20   Ok(text) -> print(\"{{length(lines(text))}} lines\")\n\
+        \x20   Err(e) -> print(\"error {{e}}\")\n\
+        \x20 }}\n\
+        \x20 match read_file(\"{at}/missing\") {{\n\
+        \x20   Ok(text) -> print(text)\n\
+        \x20   Err(_) -> print(\"absent\")\n\
+        \x20 }}\n\
+         }}\n"
+    );
+    assert_agrees("wide-core", &src);
+
+    // The output is worth pinning too: agreeing on the wrong answer is still
+    // wrong, and an empty list is exactly what the bug produced.
+    let (out, _) = compiled_output("wide-core-value", &src);
+    assert_eq!(out, "alpha.txt,beta.txt\n2 lines\nabsent\n");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Every `core` function lowers to C.
+///
+/// This used to be the opposite assertion: the backend refused the filesystem
+/// functions by name, because it had no C for them. They now have C, so the
+/// thing worth checking is that none of them is refused -- a new `core` entry
+/// with no implementation would land in the fallback arm and fail here.
+#[test]
+fn every_core_function_lowers() {
+    for b in vise_check::builtins() {
+        // `exit` and `print` return nothing, so give each call a shape that
+        // type-checks without needing the result.
+        let args = b
+            .params
+            .iter()
+            .map(|p| match p {
+                Ty::Con(name, _) if name == "Str" => "\"x\"",
+                Ty::Con(name, _) if name == "List" => "[]",
+                _ => "0",
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let src = format!("module t\nfn main() {{\n  let _ = {}({args})\n}}\n", b.name);
+        let m = module(&src);
+        let (_, types) = check_with_types(&m);
+        let emitted = emit(&m, &types);
+        assert!(
+            !emitted
+                .unsupported
+                .iter()
+                .any(|d| d.message.contains(b.name)),
+            "`{}` is a core function the backend does not lower",
+            b.name
         );
     }
 }

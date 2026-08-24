@@ -352,7 +352,10 @@ impl Interp {
                 }
                 Err(e) => err(e.to_string()),
             },
-            "is_dir" => Value::Bool(std::path::Path::new(&str_at(0)).is_dir()),
+            // Not `Path::is_dir`, which follows the link. See vise_is_dir.
+            "is_dir" => Value::Bool(
+                std::fs::symlink_metadata(str_at(0)).is_ok_and(|m| m.is_dir()),
+            ),
             "file_size" => match std::fs::metadata(str_at(0)) {
                 Ok(m) => ok(Value::Int(i64::try_from(m.len()).unwrap_or(i64::MAX))),
                 Err(e) => err(e.to_string()),

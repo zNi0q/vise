@@ -189,7 +189,7 @@ pub fn all() -> Vec<Builtin> {
             vec![s()],
             t("Bool"),
             Some(Effect::Fs),
-            "whether a path is a directory",
+            "whether a path is a directory; a link to one is not",
         ),
         f(
             "file_size",

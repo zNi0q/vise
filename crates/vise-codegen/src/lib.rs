@@ -65,6 +65,9 @@ pub fn emit(module: &Module, types: &TypeMap) -> Emitted {
     }
 }
 
+/// Slots in the runtime's `vise_enum`, from `runtime/c/value.h`.
+const MAX_ENUM_FIELDS: usize = 8;
+
 /// Built-in enums, which have no declaration to read.
 const BUILTIN_VARIANTS: &[(&str, &str, usize)] = &[
     ("Ok", "Result", 1),
@@ -121,23 +124,42 @@ impl Emitter<'_> {
             let _ = writeln!(out, "}} vise_rec_{name};\n");
         }
 
-        // Every enum shares one shape: a tag and enough slots for the widest
-        // variant. That avoids monomorphising `Result<T, E>` per instantiation.
-        let widest = self
-            .variant_payloads
-            .values()
-            .map(Vec::len)
+        // `vise_enum` is declared in value.h with a fixed width, so the
+        // runtime can return a Result without depending on this program's
+        // types. A variant too wide for it is refused rather than truncated.
+        // Counted in slots, not in fields: a string field takes two of them.
+        let payloads: Vec<Vec<Ty>> = self.variant_payloads.values().cloned().collect();
+        let widest = payloads
+            .iter()
+            .map(|fields| fields.iter().map(|t| self.slot_width(t)).sum::<usize>())
             .max()
-            .unwrap_or(0)
-            .max(1);
-        let _ = writeln!(
-            out,
-            "typedef struct {{ uint32_t tag; vise_slot f[{widest}]; }} vise_enum;\n"
-        );
+            .unwrap_or(0);
+        if widest > MAX_ENUM_FIELDS {
+            self.unsupported.push(
+                Diagnostic::error(
+                    Code::UnexpectedToken,
+                    Span::new(vise_diag::FileId(0), 0, 0),
+                    format!(
+                        "an enum variant needing {widest} payload slots; the backend supports up to \
+                         {MAX_ENUM_FIELDS}"
+                    ),
+                )
+                .with_note("`vise run` interprets the same program without this limit"),
+            );
+        }
+
         for (variant, (owner, tag)) in &self.variant_tags {
             let _ = writeln!(out, "#define VISE_TAG_{owner}_{variant} {tag}u");
         }
-        out.push('\n');
+        // The runtime builds `Ok`, `Err`, `Some`, and `None` itself, so its
+        // tags and these must be the same numbers. Checking it here means a
+        // divergence is a compile error rather than a wrong branch at runtime.
+        out.push_str(concat!(
+            "\n_Static_assert(VISE_TAG_Result_Ok == VISE_TAG_OK, \"tags must agree\");\n",
+            "_Static_assert(VISE_TAG_Result_Err == VISE_TAG_ERR, \"tags must agree\");\n",
+            "_Static_assert(VISE_TAG_Option_Some == VISE_TAG_SOME, \"tags must agree\");\n",
+            "_Static_assert(VISE_TAG_Option_None == VISE_TAG_NONE, \"tags must agree\");\n\n"
+        ));
 
         for name in self.functions.keys().cloned().collect::<Vec<_>>() {
             let decl = self.functions[&name].clone();
@@ -154,13 +176,9 @@ impl Emitter<'_> {
         // A C `main` that runs the Vise one and releases the arena.
         let has_main = self.functions.contains_key("main");
         if has_main {
-            let returns_value = self.functions["main"].ret.is_some();
-            out.push_str("int main(void) {\n");
-            if returns_value {
-                out.push_str("    (void)vise_fn_v_main();\n");
-            } else {
-                out.push_str("    vise_fn_v_main();\n");
-            }
+            out.push_str("int main(int argc, char **argv) {\n");
+            out.push_str("    vise_set_args(argc, argv);\n");
+            out.push_str("    (void)vise_fn_v_main();\n");
             out.push_str("    vise_runtime_shutdown();\n    return 0;\n}\n");
         }
         out
@@ -260,16 +278,78 @@ impl Emitter<'_> {
         }
     }
 
-    /// The union member a value of this type occupies inside an enum payload.
+    /// The union member a value of this type occupies inside a list slot.
     fn slot_member(&mut self, ty: &Ty) -> &'static str {
         match self.c_type(ty).as_str() {
             "int64_t" => "as_int",
             "double" => "as_float",
             "bool" => "as_bool",
             "uint32_t" => "as_char",
-            // Anything larger than a slot lives on the heap.
+            // Anything larger than a slot lives on the heap. A list is indexed
+            // by element, so its slots must all be one width; an enum payload
+            // is not, and `slot_width` lets those spread instead.
             _ => "as_ptr",
         }
+    }
+
+    /// How many payload slots a value of this type occupies inside an enum.
+    ///
+    /// A string and a list are each a pointer and a length, so they take two.
+    /// Spreading them is what keeps `Err("...")` from allocating: boxing one
+    /// value per construction is the single most expensive thing this backend
+    /// used to do -- on a loop returning fifty million `Result<Int, Str>`, the
+    /// box cost 0.25s and 383MB against 0.04s and 11MB without it.
+    fn slot_width(&mut self, ty: &Ty) -> usize {
+        match self.c_type(ty).as_str() {
+            "vise_str" | "vise_list" => 2,
+            _ => 1,
+        }
+    }
+
+    /// The payload slot a variant's field `index` begins at.
+    fn field_slot(&mut self, variant: &str, index: usize, subject: &Ty) -> usize {
+        (0..index)
+            .map(|i| {
+                let ty = self.payload_type(variant, i, subject);
+                self.slot_width(&ty)
+            })
+            .sum()
+    }
+
+    /// Read a variant's field out of an enum, as an expression.
+    ///
+    /// A wide field is copied out with `memcpy` rather than read through a cast
+    /// pointer, because a cast would read a `vise_str` through a `vise_slot`,
+    /// which the aliasing rules do not allow. The optimiser turns the copy back
+    /// into register moves.
+    fn load_field(&mut self, subject: &str, offset: usize, ty: &Ty) -> String {
+        let c_ty = self.c_type(ty);
+        if self.slot_width(ty) == 1 {
+            let member = self.slot_member(ty);
+            return unpack(&c_ty, member, &format!("{subject}.f[{offset}]"));
+        }
+        let out = self.temp();
+        self.line(format!("{c_ty} {out};"));
+        self.line(format!(
+            "memcpy(&{out}, &{subject}.f[{offset}], sizeof {out});"
+        ));
+        out
+    }
+
+    /// Write a value into a variant's field.
+    fn store_field(&mut self, dest: &str, offset: usize, ty: &Ty, value: &str) {
+        if self.slot_width(ty) == 1 {
+            let member = self.slot_member(ty);
+            let packed = self.pack(ty, value);
+            self.line(format!("{dest}.f[{offset}].{member} = {packed};"));
+            return;
+        }
+        let c_ty = self.c_type(ty);
+        let held = self.temp();
+        self.line(format!("{c_ty} {held} = {value};"));
+        self.line(format!(
+            "memcpy(&{dest}.f[{offset}], &{held}, sizeof {held});"
+        ));
     }
 
     fn type_of(&self, e: &Expr) -> Ty {
@@ -282,7 +362,10 @@ impl Emitter<'_> {
     fn signature(&mut self, f: &FnDecl) -> String {
         let ret = match &f.ret {
             Some(t) => self.c_type(&ty_of(t)),
-            None => "void".to_owned(),
+            // A Unit-returning function still returns a value in C: lowering it
+            // to `void` meant a call to it could not be assigned to the temporary
+            // that an `if` or `match` used as an expression needs.
+            None => "int64_t".to_owned(),
         };
         let mut params = Vec::new();
         for p in &f.params {
@@ -371,6 +454,7 @@ impl Emitter<'_> {
             self.line("return vise_result;");
         } else {
             self.line(format!("(void)({value});"));
+            self.line("return 0;");
         }
 
         let mut out = format!("{signature} {{\n");
@@ -720,45 +804,131 @@ impl Emitter<'_> {
             values.push(self.expr(a));
         }
 
-        if name.name == "print" {
-            let text = values.first().cloned().unwrap_or_default();
-            self.line(format!("vise_print({text});"));
-            return "0".to_owned();
+        if vise_check::builtin(&name.name).is_some() {
+            return self.builtin(&name.name, &values, args);
         }
 
         if let Some((owner, _)) = self.variant_tags.get(&name.name).cloned() {
-            let mut fields = Vec::new();
-            for (i, (value, arg)) in values.iter().zip(args).enumerate() {
-                let ty = self.type_of(arg);
-                let member = self.slot_member(&ty);
-                let packed = self.pack(&ty, value);
-                fields.push(format!(".f[{i}].{member} = {packed}"));
-            }
-            let initialisers = if fields.is_empty() {
-                ".f = {0}".to_owned()
-            } else {
-                fields.join(", ")
-            };
-            return format!(
-                "(vise_enum){{ .tag = VISE_TAG_{owner}_{}, {initialisers} }}",
+            // Built as statements rather than as one compound literal: a wide
+            // field is stored with `memcpy`, which is not an initialiser.
+            let built = self.temp();
+            self.line(format!("vise_enum {built};"));
+            self.line(format!("memset(&{built}, 0, sizeof {built});"));
+            self.line(format!(
+                "{built}.tag = VISE_TAG_{owner}_{};",
                 name.name
-            );
+            ));
+            let subject = self.type_of(whole);
+            for (i, (value, arg)) in values.iter().zip(args).enumerate() {
+                let declared = self.payload_type(&name.name, i, &subject);
+                // A generic built-in payload can be unknown here; the argument
+                // is then the better authority on its own type.
+                let ty = if matches!(declared, Ty::Error) {
+                    self.type_of(arg)
+                } else {
+                    declared
+                };
+                let offset = self.field_slot(&name.name, i, &subject);
+                self.store_field(&built, offset, &ty, value);
+            }
+            return built;
         }
 
         if !self.functions.contains_key(&name.name) {
-            // A `core` function the backend has no C for is a different problem
-            // from an import with no definition, and says so.
-            if vise_check::builtin(&name.name).is_some() {
-                self.refuse(
-                    whole.span,
-                    &format!("`{}`, a core function with no C implementation", name.name),
-                );
-            } else {
-                self.refuse(whole.span, "a call to an imported function");
-            }
+            self.refuse(whole.span, "a call to an imported function");
             return "0".to_owned();
         }
         format!("vise_fn_{}({})", mangle(&name.name), values.join(", "))
+    }
+
+    /// Lower a `core` call.
+    ///
+    /// Most are a direct call into `runtime/c/value.c`. Two are not: `append`
+    /// and `at` are generic, so the element's slot member is only known here,
+    /// where the checker's type map is to hand.
+    fn builtin(&mut self, name: &str, values: &[String], args: &[Expr]) -> String {
+        let arg = |i: usize| values.get(i).cloned().unwrap_or_else(|| "0".to_owned());
+
+        match name {
+            "print" => {
+                self.line(format!("vise_print({});", arg(0)));
+                "0".to_owned()
+            }
+            "exit" => {
+                self.line(format!("vise_exit({});", arg(0)));
+                "0".to_owned()
+            }
+
+            "length" => format!("(({}).len)", arg(0)),
+            "append" => {
+                let element = args.get(1).map_or(Ty::Error, |a| self.type_of(a));
+                let member = self.slot_member(&element);
+                let packed = self.pack(&element, &arg(1));
+                format!(
+                    "vise_list_append({}, (vise_slot){{ .{member} = {packed} }})",
+                    arg(0)
+                )
+            }
+            "at" => {
+                // `Option<T>`: the payload slot is read back as T, which only
+                // this pass knows.
+                let element = args
+                    .first()
+                    .map_or(Ty::Error, |a| element_type(&self.type_of(a)));
+                let list = self.temp();
+                let index = self.temp();
+                let result = self.temp();
+                self.line(format!("vise_list {list} = {};", arg(0)));
+                self.line(format!("int64_t {index} = {};", arg(1)));
+                self.line(format!("vise_enum {result};"));
+                self.line(format!("if ({index} >= 0 && {index} < {list}.len) {{"));
+                self.depth += 1;
+                self.line(format!("{result} = (vise_enum){{ .tag = VISE_TAG_SOME }};"));
+                // A list slot is one slot wide whatever it holds, so a wide
+                // element arrives boxed and has to be unpacked before it can go
+                // into the payload, which spreads it instead.
+                let c_ty = self.c_type(&element);
+                let member = self.slot_member(&element);
+                let value = unpack(&c_ty, member, &format!("{list}.items[{index}]"));
+                self.store_field(&result, 0, &element, &value);
+                self.depth -= 1;
+                self.line("} else {");
+                self.depth += 1;
+                self.line(format!("{result} = (vise_enum){{ .tag = VISE_TAG_NONE }};"));
+                self.depth -= 1;
+                self.line("}");
+                result
+            }
+
+            "str_length" => format!("vise_str_length({})", arg(0)),
+            "lines" => format!("vise_lines({})", arg(0)),
+            "split" => format!("vise_split({}, {})", arg(0), arg(1)),
+            "join" => format!("vise_join({}, {})", arg(0), arg(1)),
+            "starts_with" => format!("vise_starts_with({}, {})", arg(0), arg(1)),
+            "contains" => format!("vise_contains({}, {})", arg(0), arg(1)),
+            "parse_int" => format!("vise_parse_int({})", arg(0)),
+
+            "read_file" => format!("vise_read_file({})", arg(0)),
+            "write_file" => format!("vise_write_file({}, {})", arg(0), arg(1)),
+            "list_dir" => format!("vise_list_dir({})", arg(0)),
+            "is_dir" => format!("vise_is_dir({})", arg(0)),
+            "file_size" => format!("vise_file_size({})", arg(0)),
+
+            "args" => "vise_args()".to_owned(),
+            "now" => "vise_now()".to_owned(),
+
+            other => {
+                self.unsupported.push(
+                    Diagnostic::error(
+                        Code::UnexpectedToken,
+                        Span::new(vise_diag::FileId(0), 0, 0),
+                        format!("`{other}` is in core but the backend does not lower it"),
+                    )
+                    .with_note("`vise run` interprets the same program without this restriction"),
+                );
+                "0".to_owned()
+            }
+        }
     }
 
     fn try_expr(&mut self, whole: &Expr, inner: &Expr) -> String {
@@ -767,13 +937,12 @@ impl Emitter<'_> {
         let result = self.temp();
         let ty = self.type_of(whole);
         let c_ty = self.c_type(&ty);
-        let member = self.slot_member(&ty);
 
         self.line(format!("vise_enum {subject} = {v};"));
         self.line(format!(
             "if ({subject}.tag == VISE_TAG_Result_Err) return {subject};"
         ));
-        let unpacked = unpack(&c_ty, member, &format!("{subject}.f[0]"));
+        let unpacked = self.load_field(&subject, 0, &ty);
         self.line(format!("{c_ty} {result} = {unpacked};"));
         result
     }
@@ -868,10 +1037,10 @@ impl Emitter<'_> {
                     // Only a nested constructor needs a further test; a binding
                     // or wildcard always matches.
                     if let PatternKind::Variant { .. } | PatternKind::Literal(_) = &sub.kind {
-                        let payload = self.payload_type(&name.name, i);
+                        let payload = self.payload_type(&name.name, i, ty);
                         let c_ty = self.c_type(&payload);
-                        let member = self.slot_member(&payload);
-                        let inner = unpack(&c_ty, member, &format!("{subject}.f[{i}]"));
+                        let offset = self.field_slot(&name.name, i, ty);
+                        let inner = self.load_field(subject, offset, &payload);
                         let nested = self.temp();
                         self.line(format!("{c_ty} {nested} = ({subject}.tag == VISE_TAG_{owner}_{}) ? {inner} : ({c_ty}){{0}};", name.name));
                         let sub_test = self.pattern_test(sub, &nested, &payload);
@@ -894,10 +1063,10 @@ impl Emitter<'_> {
             PatternKind::Variant { path, fields } => {
                 let Some(name) = path.as_single() else { return };
                 for (i, sub) in fields.iter().enumerate() {
-                    let payload = self.payload_type(&name.name, i);
+                    let payload = self.payload_type(&name.name, i, ty);
                     let c_ty = self.c_type(&payload);
-                    let member = self.slot_member(&payload);
-                    let value = unpack(&c_ty, member, &format!("{subject}.f[{i}]"));
+                    let offset = self.field_slot(&name.name, i, ty);
+                    let value = self.load_field(subject, offset, &payload);
                     let slot = self.temp();
                     self.line(format!("{c_ty} {slot} = {value};"));
                     self.bind_pattern(sub, &slot, &payload);
@@ -906,16 +1075,25 @@ impl Emitter<'_> {
         }
     }
 
-    /// The declared type of a variant's field, or the inferred one for a
-    /// built-in whose payload is generic.
-    fn payload_type(&self, variant: &str, index: usize) -> Ty {
-        match self
-            .variant_payloads
-            .get(variant)
-            .and_then(|f| f.get(index))
-        {
-            Some(Ty::Error) | None => Ty::Error,
-            Some(ty) => ty.clone(),
+    /// The type of a variant's field.
+    ///
+    /// A user variant declares its fields, so the table has them. A built-in
+    /// does not: `Ok`'s payload is whatever `T` is in the `Result<T, E>` being
+    /// matched, which is only knowable from the value under inspection.
+    fn payload_type(&self, variant: &str, index: usize, subject: &Ty) -> Ty {
+        let from_subject = |i: usize| match subject {
+            Ty::Con(_, args) => args.get(i).cloned().unwrap_or(Ty::Error),
+            _ => Ty::Error,
+        };
+        match variant {
+            "Ok" | "Some" => from_subject(0),
+            "Err" => from_subject(1),
+            _ => self
+                .variant_payloads
+                .get(variant)
+                .and_then(|f| f.get(index))
+                .cloned()
+                .unwrap_or(Ty::Error),
         }
     }
 }
