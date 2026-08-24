@@ -201,10 +201,20 @@ Found while implementing; each needs a decision before the parser lands.
     `None -> out = append(...)` is a syntax error. Using the match as an
     expression is better style anyway, but the diagnostic does not suggest it.
     Hit independently by a benchmark agent and while writing `growth`.
-12. **The interpreter is too slow for a large filesystem walk.** `growth` on a
-    tree of tens of thousands of files does not finish in minutes. The fix is
-    the native backend, which currently refuses the `fs` builtins because they
-    have no C implementations.
+12. ~~**The interpreter is too slow for a large filesystem walk.**~~ —
+    **resolved**: the `fs` builtins have C now, and compiled `growth` walks
+    90,000 files in 0.72s, against 0.64s for the identical algorithm written in
+    C. `vise run` is still the slow path and is meant to be.
+13. **`vise fmt` deletes every comment.** Reducible to three lines: a file with
+    a comment above `fn main` and one inside it comes back with neither. The
+    formatter reprints the AST, and the parser keeps comments nowhere, so
+    reprinting cannot put back what was never stored. This is data loss in a
+    tool the installer ships and CI dogfoods -- and CI did not catch it because
+    every file in `examples/` happens to have no comments. Fixing it means
+    attaching trivia to tokens and reattaching it when reprinting, which is
+    real work and not a patch. Until then `vise fmt` should not be run on
+    anything with comments worth keeping; `bench/speed/*.vise` and
+    `tools/growth.vise` are deliberately left non-canonical for that reason.
 
 ## Open questions
 
