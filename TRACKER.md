@@ -84,7 +84,7 @@ wrong and the repo should say so.
       that drives them is not written yet
 - [~] Trace record / replay runtime done (`runtime/c/trace.c`); the CLI flags
       that drive it are not wired up yet
-- [ ] Deterministic softfloat for transcendentals
+- [x] Deterministic softfloat for transcendentals (`runtime/c/softfloat.c`)
 - [ ] Proof that static effect rows and runtime confinement agree
 
 ## M6 — Native backend

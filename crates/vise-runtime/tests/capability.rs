@@ -97,6 +97,14 @@ fn traces_record_and_replay() {
     run_c_suite(env!("VISE_TEST_TRACE"), "trace");
 }
 
+/// Runs the C softfloat suite: each function agrees with the platform libm to
+/// within a few units in the last place, and repeated calls are bit-identical.
+#[test]
+#[cfg(target_os = "linux")]
+fn transcendentals_are_reproducible() {
+    run_c_suite(env!("VISE_TEST_SOFTFLOAT"), "softfloat");
+}
+
 /// `confine` is deliberately not called in-process anywhere else: it cannot be
 /// undone, so a test that installed a filter would constrain every test after
 /// it in the same process.

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Every C translation unit in the runtime library.
-const SOURCES: &[&str] = &["capability.c", "fiber.c", "trace.c"];
+const SOURCES: &[&str] = &["capability.c", "fiber.c", "trace.c", "softfloat.c"];
 
 /// C test programs, and the library sources each needs. They are built here and
 /// run from a Rust test: the cases fork, install irreversible filters, and
@@ -18,6 +18,7 @@ const TEST_PROGRAMS: &[(&str, &[&str])] = &[
     ("test_capability", &["capability.c"]),
     ("test_fiber", &["fiber.c"]),
     ("test_trace", &["trace.c"]),
+    ("test_softfloat", &["softfloat.c"]),
 ];
 
 /// Warnings are errors: this code is small enough that every one is real.
@@ -101,6 +102,11 @@ fn main() {
         build.arg(runtime.join(format!("{name}.c")));
         if *name == "test_fiber" && has_asm {
             build.arg(asm.join("switch_x86_64.S"));
+        }
+        // The softfloat suite compares against the platform libm, which is the
+        // only place this project links it.
+        if *name == "test_softfloat" {
+            build.arg("-lm");
         }
         run(
             build.arg("-I").arg(&runtime).arg("-o").arg(&binary),
