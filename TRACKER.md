@@ -102,6 +102,8 @@ wrong and the repo should say so.
 - [!] Deterministic destruction ordering — the arena frees at exit; precise
       destruction needs the borrow checker's ownership data lowered
 - [x] End-to-end: `vise build` produces a native binary
+- [x] `core` implemented in C, so compiled programs can use the filesystem
+- [x] Speed: at parity with C obeying the same trapping rules — `bench/speed`
 
 ---
 
@@ -124,6 +126,10 @@ wrong and the repo should say so.
 | 2026-08-24 | No allocator yet | The stated reason was determinism, but an address is not observable from Vise: there is no pointer printing and no address comparison, and destruction order is set by scope rather than by the allocator. It becomes worth writing when the arena for graph data does (M4). |
 | 2026-08-24 | No scheduler yet | Fibers are the substrate, but §13 rules out shared-memory threading and the language has no concurrency construct, so there is nothing to schedule. Building one now would be speculative. |
 | 2026-08-24 | No separate IR; the backend emits C from the checked AST | An IR earns its place with several backends or optimisation passes. With one backend it is indirection, and it can be introduced later without changing the front end. |
+| 2026-08-24 | An enum payload wider than one slot spreads across several, rather than being boxed | Boxing allocated once per construction, and the arena never takes it back: `Err("odd")` in a loop cost 383MB and 8x the time. A list slot still boxes, because a list is indexed by element and its slots must be one width. |
+| 2026-08-24 | Trapping arithmetic is `static inline` in value.h, and `vise build` passes -flto | Out of line, the overflow check could not be hoisted, folded, or seen through. Inlined it costs what unchecked C costs, so §4 is free and only the call was expensive. |
+| 2026-08-24 | A large list buffer is mapped with far more address space reserved than it needs | Lets it grow in place instead of being copied and abandoned. It must not move, because other lists may point into it, and reserved pages cost nothing until written. |
+| 2026-08-24 | `is_dir` uses lstat: a link to a directory is a link | It followed links before, so a link pointing at an ancestor made a tree walk unbounded. Matches what `du` does by default. |
 | 2026-08-23 | A numeric literal adopts the other operand's type | Resolves a contradiction between §4 (distinct types) and §10 (whose `fee` example did arithmetic between `Cents` and integer literals). Narrowest rule that works: named types still never mix. |
 
 ## Open spec issues

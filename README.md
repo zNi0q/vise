@@ -27,6 +27,13 @@ soundness hole in the checker — `.clone()` passed `vise check` and trapped at
 runtime — which is the failure the language exists to prevent, in the language
 itself.
 
+One claim it *has* survived: compiled Vise runs at the speed of C obeying the
+same rules. Across four kernels it is at parity with C written to trap on
+overflow and to bounds-check the way §4 requires, and 1.1x to 1.8x slower than
+C that does neither — which is what the trapping rule costs, not what the
+backend costs. `bench/speed/README.md` has the numbers, the fourth arm that
+makes them mean something, and what they do not cover.
+
 ## Why "Python-easy and Rust-strict" is achievable here
 
 Not by weakening Rust. Vise keeps the ownership model whole: single ownership,
@@ -89,6 +96,8 @@ crates/           compiler (Rust)
 runtime/c         capability gate, allocator, trace, softfloat
 runtime/asm       context switch, trampoline
 bench/            the experiment: agent repair-iteration harness
+bench/speed       the other measurement: runtime speed against C and Rust
+tools/            programs written in Vise
 ```
 
 ## Installing
