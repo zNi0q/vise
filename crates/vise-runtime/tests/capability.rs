@@ -73,6 +73,27 @@ fn the_gate_actually_confines() {
     );
 }
 
+/// Runs the C fiber suite: interleaving, stack isolation, and that the schedule
+/// is byte-identical across runs, which is what makes a trace replayable.
+#[test]
+#[cfg(target_arch = "x86_64")]
+fn fibers_switch_deterministically() {
+    assert!(
+        vise_runtime::fibers_supported(),
+        "x86-64 should have a context switch"
+    );
+    let binary = env!("VISE_FIBERTEST");
+    let output = std::process::Command::new(binary)
+        .output()
+        .unwrap_or_else(|e| panic!("could not run {binary}: {e}"));
+    assert!(
+        output.status.success(),
+        "fiber cases failed:\n{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 /// `confine` is deliberately not called in-process anywhere else: it cannot be
 /// undone, so a test that installed a filter would constrain every test after
 /// it in the same process.

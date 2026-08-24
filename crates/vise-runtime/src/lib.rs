@@ -17,6 +17,7 @@ use vise_ast::Effect;
 
 #[cfg(not(vise_no_runtime))]
 unsafe extern "C" {
+    fn vise_fiber_supported() -> i32;
     fn vise_caps_apply(effects: u32) -> u32;
     fn vise_caps_syscall_count(effects: u32) -> u32;
     fn vise_caps_strerror(result: u32) -> *const c_char;
@@ -44,6 +45,25 @@ impl fmt::Display for ConfineError {
 }
 
 impl std::error::Error for ConfineError {}
+
+/// Whether this build has a context switch for the running architecture.
+///
+/// Fibers are the scheduling substrate for §11: a Vise program's execution
+/// order must be a property of its source, not of when the OS chose to preempt
+/// it. The switch itself is assembly, because saving callee-saved registers and
+/// exchanging stack pointers cannot be written in C.
+#[must_use]
+pub fn fibers_supported() -> bool {
+    #[cfg(vise_no_runtime)]
+    {
+        false
+    }
+    #[cfg(not(vise_no_runtime))]
+    // SAFETY: reads a compile-time constant and returns it.
+    unsafe {
+        vise_fiber_supported() != 0
+    }
+}
 
 /// The bit for one effect.
 ///

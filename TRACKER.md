@@ -80,7 +80,8 @@ wrong and the repo should say so.
 - [x] Capability gate: seccomp-bpf filter derived from the effect row
       (`runtime/c/capability.c`), with a C suite that forks per case
 - [ ] Syscall trampoline (asm)
-- [ ] Deterministic scheduler; x86-64 context switch (asm)
+- [~] x86-64 context switch (asm) and cooperative fibers done; the scheduler
+      that drives them is not written yet
 - [ ] Trace record / replay (`vise run --record`, `vise replay`)
 - [ ] Deterministic softfloat for transcendentals
 - [ ] Proof that static effect rows and runtime confinement agree
