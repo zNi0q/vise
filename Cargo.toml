@@ -21,6 +21,7 @@ vise-ir = { path = "crates/vise-ir" }
 vise-codegen = { path = "crates/vise-codegen" }
 vise-fmt = { path = "crates/vise-fmt" }
 vise-interp = { path = "crates/vise-interp" }
+vise-runtime = { path = "crates/vise-runtime" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

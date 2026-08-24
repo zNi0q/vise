@@ -1,0 +1,23 @@
+[package]
+name = "vise-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[dependencies]
+vise-ast.workspace = true
+
+# This crate does not use `[lints] workspace = true`. The workspace forbids
+# unsafe code, mirroring the language's own rule that user code cannot opt out.
+# This crate is the layer below the language — spec §9: "Data structures that
+# require it live below the language, in the stdlib, implemented in Rust and C."
+# Calling into C is exactly that, so the exception is declared here, in one
+# place, rather than sprinkled through the tree.
+[lints.rust]
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

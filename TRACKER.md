@@ -77,7 +77,8 @@ wrong and the repo should say so.
 ## M5 — Runtime (C + Assembly)
 
 - [ ] Allocator
-- [ ] Capability gate: seccomp-bpf filter derived from the effect row
+- [x] Capability gate: seccomp-bpf filter derived from the effect row
+      (`runtime/c/capability.c`), with a C suite that forks per case
 - [ ] Syscall trampoline (asm)
 - [ ] Deterministic scheduler; x86-64 context switch (asm)
 - [ ] Trace record / replay (`vise run --record`, `vise replay`)
@@ -156,6 +157,17 @@ Found while implementing; each needs a decision before the parser lands.
    published alongside imports.
 8. **Method calls are assumed pure.** `.clone()` is, but nothing enforces that
    for any other method. Becomes a real lookup once types exist.
+
+9. **§7 claims more than syscall filtering can deliver.** It says "the process
+   is sandboxed to exactly the syscalls its effect row implies". Two effects
+   cannot be enforced that way on Linux. `time` is read from the vDSO and never
+   enters the kernel, so a process denied `time` can still read the clock.
+   `env` arrives on the initial stack, so reading it is memory access. Both are
+   enforced by the compiler alone. `fs`, `net`, `rand`, `proc`, and the
+   descriptor side of `io` *are* enforced twice. Either the sentence softens,
+   or the runtime has to arrange for a program to start without a vDSO, which
+   cannot be done from inside the process. Documented in
+   `runtime/c/capability.h` and pinned by a test.
 
 ## Open questions
 
