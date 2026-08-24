@@ -1,4 +1,4 @@
-# Vise Language Specification v0.5
+# Vise Language Specification v0.6
 
 **Vise lets an AI agent write software you don't have to read, because the
 compiler — not a human reviewer — guarantees what the code does and what it is
@@ -160,6 +160,29 @@ domain, may take one on.
 
 Generics are parametric — `fn first<T>(xs: List<T>) -> Option<T>`. No traits,
 no overloading: one name resolves to exactly one definition.
+
+### Operators
+
+| Written | Meaning | Operand types |
+|---|---|---|
+| `+` `-` `*` `/` `%` | arithmetic | `Int`, `Float`, or a type declared over one |
+| `==` `!=` | equality | any two values of one type |
+| `<` `<=` `>` `>=` | ordering | `Int`, `Float`, `Str`, `Char` |
+| `&&` `\|\|` | logic, short-circuiting | `Bool` |
+| `-` prefix | negation | `Int`, `Float` |
+| `!` prefix | logical not | `Bool` |
+| `?` postfix | propagate an `Err` (§8) | `Result` |
+
+Arithmetic binds tighter than comparison, comparison tighter than `&&`, and
+`&&` tighter than `||`. Arithmetic and logic are left-associative.
+**Comparisons do not chain**: `a < b < c` is an error rather than something
+that quietly compares a `Bool` with a number.
+
+Integer arithmetic traps on overflow and `/` and `%` trap on a zero divisor.
+`%` takes the sign of its left operand.
+
+There is no `++`, no compound assignment such as `+=`, no bitwise operator, and
+no operator overloading.
 
 **Types are inferred everywhere except public signatures.** Locals, closures,
 and private functions need no annotations. Public functions annotate their

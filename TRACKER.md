@@ -176,6 +176,12 @@ Found while implementing; each needs a decision before the parser lands.
    cannot be done from inside the process. Documented in
    `runtime/c/capability.h` and pinned by a test.
 
+10. ~~The spec never lists the operators~~ — **fixed in v0.6**. Found by the
+    benchmark: an agent avoided `%` because the specification did not say it
+    existed, and was right to, since §0 declares the document complete. The
+    closed-world rule worked; the document did not. §4 now has an operator
+    table.
+
 ## Open questions
 
 Tracked in `README.md`. The load-bearing one is whether the borrow checker
