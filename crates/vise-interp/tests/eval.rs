@@ -253,6 +253,19 @@ fn question_mark_propagates_err_immediately() {
     );
 }
 
+// --- methods ------------------------------------------------------------
+
+#[test]
+fn clone_yields_the_same_value() {
+    // §9's one method. Values are immutable and shared, so a clone is the value
+    // itself; what it buys is ownership, which the borrow checker cares about
+    // and the evaluator does not.
+    assert_eq!(
+        output("module t\nfn main() {\n  let a = \"x\"\n  let b = a.clone()\n  print(b)\n}\n"),
+        ["x"]
+    );
+}
+
 // --- output -------------------------------------------------------------
 
 #[test]

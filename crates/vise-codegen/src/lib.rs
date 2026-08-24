@@ -567,9 +567,22 @@ impl Emitter<'_> {
                 self.refuse(e.span, "a borrow");
                 "0".to_owned()
             }
-            ExprKind::MethodCall { .. } => {
-                self.refuse(e.span, "a method call");
-                "0".to_owned()
+            ExprKind::MethodCall {
+                receiver,
+                method,
+                args,
+            } => {
+                let value = self.expr(receiver);
+                for a in args {
+                    self.expr(a);
+                }
+                if method.name == "clone" && args.is_empty() {
+                    // Values are immutable, so a clone is the value itself.
+                    value
+                } else {
+                    self.refuse(e.span, "a method other than `.clone()`");
+                    "0".to_owned()
+                }
             }
         }
     }

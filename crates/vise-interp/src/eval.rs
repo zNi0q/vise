@@ -529,8 +529,26 @@ impl Interp {
             }
             ExprKind::Break => return Err(Abort::Break),
             ExprKind::Continue => return Err(Abort::Continue),
-            ExprKind::MethodCall { .. } => {
-                return Err(Trap::Unsupported("method calls".to_owned()).into());
+            ExprKind::MethodCall {
+                receiver,
+                method,
+                args,
+            } => {
+                let value = self.eval(receiver)?;
+                for a in args {
+                    self.eval(a)?;
+                }
+                if method.name != "clone" || !args.is_empty() {
+                    // The checker rejects this, so reaching here means it was
+                    // bypassed.
+                    return Err(
+                        Trap::Unsupported(format!("`{}` is not a method", method.name)).into(),
+                    );
+                }
+                // Values are immutable and shared, so a clone is the value
+                // itself. What `.clone()` buys is ownership, which matters to
+                // the borrow checker rather than to the evaluator.
+                value
             }
         };
         Ok(v)

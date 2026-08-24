@@ -479,13 +479,35 @@ impl Checker {
                 Ty::Error
             }
             ExprKind::Call { callee, args } => self.call(e, callee, args),
-            ExprKind::MethodCall { receiver, args, .. } => {
-                self.expr(receiver);
+            ExprKind::MethodCall {
+                receiver,
+                method,
+                args,
+            } => {
+                let received = self.expr(receiver);
                 for a in args {
                     self.expr(a);
                 }
-                // No trait system, so a method has no signature to check.
-                Ty::Error
+                // §9 defines exactly one method. Returning a poison type for
+                // anything else would let `s.wibble()` type-check and then fail
+                // at runtime, which is the failure this language exists to
+                // prevent.
+                if method.name == "clone" && args.is_empty() {
+                    received
+                } else {
+                    self.diagnostics.push(
+                        Diagnostic::error(
+                            Code::UnknownName,
+                            method.span,
+                            format!("`{}` is not a method", method.name),
+                        )
+                        .with_note(
+                            "Vise has no traits, so `.clone()` is the only method there is (§9)",
+                        )
+                        .with_scope(["clone"]),
+                    );
+                    Ty::Error
+                }
             }
             ExprKind::Field { base, name } => {
                 let base_ty = self.expr(base);

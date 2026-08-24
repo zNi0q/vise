@@ -19,6 +19,14 @@ shorter, and "it compiles" becomes strong evidence of "it is correct."**
 
 That claim is falsifiable, and falsifying it is the point of this repo.
 
+**It has not survived its first test.** Across nine tasks, Vise took *more*
+repair iterations than TypeScript (1.33 against 1.11) and about 22% more
+tokens. See `bench/RESULTS.md` for the numbers, the biases, and why the tasks
+were probably too small to test the claim properly. The same run found a
+soundness hole in the checker — `.clone()` passed `vise check` and trapped at
+runtime — which is the failure the language exists to prevent, in the language
+itself.
+
 ## Why "Python-easy and Rust-strict" is achievable here
 
 Not by weakening Rust. Vise keeps the ownership model whole: single ownership,

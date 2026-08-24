@@ -378,9 +378,30 @@ fn one_mistake_produces_one_diagnostic() {
 }
 
 #[test]
-fn methods_and_imports_are_opaque_not_guessed() {
+fn imports_are_opaque_not_guessed() {
     clean("module m\nuse std/http@1:{post}\nfn f() -> Int {\n  let r = post(\"/x\")\n  0\n}\n");
-    clean("module m\nfn f(s: Str) -> Int {\n  let c = s.clone()\n  0\n}\n");
+}
+
+#[test]
+fn clone_returns_the_receivers_type() {
+    clean("module m\nfn f(s: Str) -> Str { s.clone() }\n");
+    assert_eq!(
+        codes("module m\nfn f(s: Str) -> Int { s.clone() }\n"),
+        ["V0302"]
+    );
+}
+
+#[test]
+fn an_unknown_method_is_rejected_rather_than_deferred() {
+    // Found by the benchmark: returning a poison type here let `s.to_upper()`
+    // pass the checker and then trap at runtime, which is precisely the
+    // failure this language exists to prevent.
+    let d = check_types(&module("module m\nfn f(s: Str) -> Str { s.to_upper() }\n"))
+        .into_iter()
+        .next()
+        .expect("a diagnostic");
+    assert_eq!(d.code.as_str(), "V0201");
+    assert_eq!(d.in_scope, ["clone"]);
 }
 
 // --- the spec's examples ------------------------------------------------
