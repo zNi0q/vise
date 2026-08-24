@@ -195,6 +195,25 @@ fn result_and_question_mark_agree() {
 }
 
 #[test]
+fn borrows_lower_transparently() {
+    // `&T` has the same type as `T`: values are immutable, so a borrow and its
+    // referent lower to the same thing. This used to be refused.
+    assert_agrees(
+        "borrows",
+        concat!(
+            "module t\n",
+            "fn total(xs: &List<Int>) -> Int {\n",
+            "  var sum = 0\n  for x in xs { sum = sum + x }\n  sum\n}\n",
+            "fn main() {\n",
+            "  let xs = [1, 2, 3]\n",
+            "  print(\"{total(&xs)}\")\n",
+            "  print(\"{total(&xs)}\")\n",
+            "}\n"
+        ),
+    );
+}
+
+#[test]
 fn strings_agree() {
     // Comparisons are computed outside the interpolation: a string literal
     // cannot be nested inside one.
@@ -256,9 +275,11 @@ fn unsupported_constructs_are_named_not_miscompiled() {
             "module t\nuse std/http@1:{post}\nfn main() {\n  let r = post(\"/x\")\n}\n",
             "imported function",
         ),
+        // A core function with no C implementation is refused by name, and
+        // distinctly from an import, which has no definition at all.
         (
-            "module t\nfn peek(xs: &List<Int>) -> Int { 0 }\nfn main() {\n  let xs = [1]\n  let n = peek(&xs)\n}\n",
-            "borrow",
+            "module t\nfn main() {\n  let r = read_file(\"x\")\n}\n",
+            "read_file",
         ),
     ] {
         let m = module(src);
