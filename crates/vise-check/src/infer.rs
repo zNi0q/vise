@@ -57,16 +57,36 @@ struct CtorSig {
     fields: Vec<Ty>,
 }
 
+/// The inferred type of every expression, keyed by its span.
+///
+/// Handed to the backend so it does not have to reconstruct what the checker
+/// already worked out. Keyed by byte range rather than by `Span`, because a
+/// module is one file and two expressions cannot share a range.
+pub type TypeMap = BTreeMap<(u32, u32), Ty>;
+
 /// Type-check every function in `module`.
 #[must_use]
 pub fn check(module: &Module) -> Vec<Diagnostic> {
+    check_with_types(module).0
+}
+
+/// Type-check, and return what each expression turned out to be.
+#[must_use]
+pub fn check_with_types(module: &Module) -> (Vec<Diagnostic>, TypeMap) {
     let mut c = Checker::new(module);
     for item in &module.items {
         if let ItemKind::Fn(f) = &item.kind {
             c.function(f);
         }
     }
-    c.diagnostics
+    // Resolve now: a type recorded mid-inference may still hold variables that
+    // were only decided later.
+    let resolved = c
+        .recorded
+        .iter()
+        .map(|(span, ty)| (*span, c.table.resolve(ty)))
+        .collect();
+    (c.diagnostics, resolved)
 }
 
 struct Checker {
@@ -82,6 +102,8 @@ struct Checker {
     scopes: Vec<BTreeMap<String, Ty>>,
     /// Return type of the function being checked.
     ret: Ty,
+    /// What each expression came out as, for the backend.
+    recorded: TypeMap,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -102,6 +124,7 @@ impl Checker {
             bases: BTreeMap::new(),
             scopes: Vec::new(),
             ret: Ty::unit(),
+            recorded: TypeMap::new(),
             diagnostics: Vec::new(),
         };
 
@@ -423,6 +446,12 @@ impl Checker {
     // --- expressions -----------------------------------------------------
 
     fn expr(&mut self, e: &Expr) -> Ty {
+        let ty = self.expr_inner(e);
+        self.recorded.insert((e.span.start, e.span.end), ty.clone());
+        ty
+    }
+
+    fn expr_inner(&mut self, e: &Expr) -> Ty {
         match &e.kind {
             ExprKind::Literal(lit) => self.literal(lit),
             ExprKind::Path(p) => {

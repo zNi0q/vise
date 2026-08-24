@@ -37,7 +37,11 @@ dependencies = [
 name = "vise-codegen"
 version = "0.1.0"
 dependencies = [
- "vise-ir",
+ "vise-ast",
+ "vise-check",
+ "vise-diag",
+ "vise-interp",
+ "vise-parse",
 ]
 
 [[package]]

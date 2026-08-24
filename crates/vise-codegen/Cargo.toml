@@ -7,7 +7,13 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-vise-ir.workspace = true
+vise-ast.workspace = true
+vise-check.workspace = true
+vise-diag.workspace = true
+
+[dev-dependencies]
+vise-parse.workspace = true
+vise-interp.workspace = true
 
 [lints]
 workspace = true

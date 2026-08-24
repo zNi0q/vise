@@ -13,6 +13,7 @@ vise — a language whose author is a machine
 usage:
   vise check <file.vise> [--json]  parse, resolve, and type-check
   vise run <file.vise>             check, then run `main`
+  vise build <file.vise> [-o out]  check, then compile to a native binary
   vise fix <file.vise> [--dry-run] apply every unambiguous fix
   vise fmt <file.vise> [--check]   rewrite in canonical form
   vise parse <file.vise> [--json]  parse only
@@ -50,6 +51,8 @@ fn main() -> ExitCode {
         ["check", path] => run(path, Stage::Check, false),
         ["check", path, "--json"] | ["check", "--json", path] => run(path, Stage::Check, true),
         ["run", path] => run_file(path),
+        ["build", path] => build_file(path, None),
+        ["build", path, "-o", out] | ["build", "-o", out, path] => build_file(path, Some(out)),
         ["fmt", path] => fmt_file(path, false),
         ["fmt", path, "--check"] | ["fmt", "--check", path] => fmt_file(path, true),
         ["fix", path] => fix_file(path, false),
@@ -165,6 +168,92 @@ fn run(path: &str, stage: Stage, as_json: bool) -> ExitCode {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+/// The C runtime is embedded rather than looked up on disk, so a built binary
+/// does not depend on where the compiler was installed from.
+const VALUE_H: &str = include_str!("../../../runtime/c/value.h");
+const VALUE_C: &str = include_str!("../../../runtime/c/value.c");
+
+/// Check, lower to C, and hand the result to a C compiler.
+fn build_file(path: &str, output: Option<&str>) -> ExitCode {
+    let text = match read(path) {
+        Ok(t) => t,
+        Err(code) => return code,
+    };
+
+    let mut map = SourceMap::new();
+    let file = map.add(path, text.clone());
+    let parsed = vise_parse::parse(&text, file);
+    let a = analyze(path, &text, Stage::Check);
+    if a.errors() > 0 {
+        print!("{}", render::report(&a.diagnostics, &a.map));
+        eprintln!("not building: {} error(s)", a.errors());
+        return ExitCode::FAILURE;
+    }
+    let Some(module) = &parsed.module else {
+        return ExitCode::FAILURE;
+    };
+
+    // Re-run inference for its type map; the backend needs what each
+    // expression turned out to be.
+    let (_, types) = vise_check::check_with_types(module);
+    let emitted = vise_codegen::emit(module, &types);
+    if !emitted.is_complete() {
+        print!("{}", render::report(&emitted.unsupported, &a.map));
+        eprintln!(
+            "not building: {} unsupported construct(s)",
+            emitted.unsupported.len()
+        );
+        return ExitCode::FAILURE;
+    }
+
+    let stem = std::path::Path::new(path)
+        .file_stem()
+        .map_or_else(|| "a.out".to_owned(), |s| s.to_string_lossy().into_owned());
+    let binary = output.map_or(stem, ToOwned::to_owned);
+
+    let dir = std::env::temp_dir().join(format!("vise-build-{}", std::process::id()));
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        eprintln!("cannot create a build directory: {e}");
+        return ExitCode::from(2);
+    }
+
+    let write = |name: &str, contents: &str| std::fs::write(dir.join(name), contents);
+    if let Err(e) = write("value.h", VALUE_H)
+        .and_then(|()| write("value.c", VALUE_C))
+        .and_then(|()| write("program.c", &emitted.c_source))
+    {
+        eprintln!("cannot write the generated sources: {e}");
+        return ExitCode::from(2);
+    }
+
+    let cc = std::env::var("CC").unwrap_or_else(|_| "cc".to_owned());
+    let status = std::process::Command::new(&cc)
+        .args(["-std=c11", "-O2", "-o"])
+        .arg(&binary)
+        .arg(dir.join("program.c"))
+        .arg(dir.join("value.c"))
+        .arg("-I")
+        .arg(&dir)
+        .status();
+
+    let _ = std::fs::remove_dir_all(&dir);
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("built {binary}");
+            ExitCode::SUCCESS
+        }
+        Ok(s) => {
+            eprintln!("the C compiler exited with {s}");
+            ExitCode::FAILURE
+        }
+        Err(e) => {
+            eprintln!("could not run {cc}: {e}");
+            ExitCode::from(2)
+        }
     }
 }
 

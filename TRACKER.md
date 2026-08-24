@@ -89,11 +89,12 @@ wrong and the repo should say so.
 
 ## M6 — Native backend
 
-- [ ] IR definition
-- [ ] Lowering from checked AST
-- [ ] Cranelift or C emission (decide once IR exists)
-- [ ] Deterministic destruction ordering in codegen
-- [ ] End-to-end: `vise build` producing a native binary
+- [x] ~~IR definition~~ — not needed for one backend, see decisions
+- [x] Lowering from the checked AST, using the checker's own type map
+- [x] C emission (`crates/vise-codegen`)
+- [!] Deterministic destruction ordering — the arena frees at exit; precise
+      destruction needs the borrow checker's ownership data lowered
+- [x] End-to-end: `vise build` produces a native binary
 
 ---
 

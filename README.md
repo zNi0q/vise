@@ -90,9 +90,17 @@ option.
 
 ## Status
 
-Spec v0.4. The front end runs, and the closed namespace is enforced: `vise
-lex`, `vise parse`, and `vise check` accept the full language and report
-diagnostics as text or JSON. Types, effects, and ownership are not checked yet.
+Spec v0.5. The compiler runs end to end: `vise check` resolves names and checks
+types, effects, exhaustiveness, dropped `Result`s, and ownership; `vise run`
+interprets; `vise build` compiles to a native binary; `vise fmt` canonicalises;
+`vise fix` applies the unambiguous repairs.
+
+```
+$ vise build examples/greet.vise && ./greet
+hello, ada
+hello, alan
+hello, grace
+```
 
 The central claim, working:
 
@@ -129,7 +137,9 @@ guessing which name was meant is the author's decision.
 3. **Compiler front end** — ~~lexer~~, ~~parser~~, ~~name resolution~~, type
    inference, borrow checker, effect inference.
 4. **Runtime** — capability gate, allocator, trace record/replay, scheduler.
-5. **Native backend** — Cranelift or C emission.
+5. **Native backend** — ~~C emission~~. `vise build` produces a native binary;
+   a differential suite runs each program compiled *and* interpreted and fails
+   if the two ever disagree.
 
 ## Open questions
 
